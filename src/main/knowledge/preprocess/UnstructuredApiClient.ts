@@ -1,8 +1,8 @@
 import { loggerService } from '@logger'
-import type { AxiosInstance } from 'axios'
-import axios from 'axios'
 import Bottleneck from 'bottleneck'
-import FormDataNode from 'form-data'
+import { UnstructuredClient } from 'unstructured-client'
+import type { PartitionResponse } from 'unstructured-client/sdk/models/operations'
+import { Strategy } from 'unstructured-client/sdk/models/shared'
 
 import type {
   BoundingBox,
@@ -17,18 +17,16 @@ import type {
 const logger = loggerService.withContext('UnstructuredApiClient')
 
 export class UnstructuredApiClient {
-  private httpClient: AxiosInstance
+  private client: UnstructuredClient
   private rateLimiter: Bottleneck
 
   constructor(private config: UnstructuredConfig) {
-    this.httpClient = axios.create({
-      baseURL: config.apiEndpoint,
-      timeout: config.timeoutMs,
-      headers: config.apiKey
-        ? {
-            'unstructured-api-key': config.apiKey
-          }
-        : {}
+    // Initialize the official Unstructured client
+    this.client = new UnstructuredClient({
+      security: {
+        apiKeyAuth: config.apiKey || ''
+      },
+      serverURL: config.apiEndpoint
     })
 
     // Token bucket rate limiter (10 requests per minute for hosted, 100 for self-hosted)
@@ -73,61 +71,50 @@ export class UnstructuredApiClient {
           params
         })
 
-        const formData = new FormDataNode()
-        const mimeType = this.getMimeType(fileName)
-        // Use form-data package for Node.js - pass buffer with metadata
-        formData.append('files', fileBuffer, {
-          filename: fileName,
-          contentType: mimeType
-        })
-        formData.append('strategy', params.strategy)
-        formData.append('chunking_strategy', params.chunkingStrategy)
-        formData.append('output_format', 'application/json')
-
-        // Optional parameters - only include those supported by the API
-        if (params.includePageBreaks) {
-          formData.append('include_page_breaks', 'true')
-        }
-        if (params.coordinates) {
-          formData.append('coordinates', 'true')
-        }
-        if (params.pdfInferTableStructure) {
-          formData.append('pdf_infer_table_structure', 'true')
-        }
-        if (params.languages && params.languages.length > 0) {
-          // Pass each language as individual form field as per Unstructured.io API documentation
-          params.languages.forEach((language) => {
-            formData.append('languages', language)
-          })
+        // Map strategy to the official client's Strategy enum
+        const strategyMapping: Record<string, Strategy> = {
+          fast: Strategy.Fast,
+          hi_res: Strategy.HiRes,
+          auto: Strategy.Auto
         }
 
-        // Chunking parameters
-        if (params.maxCharacters !== undefined) {
-          formData.append('max_characters', String(params.maxCharacters))
-        }
-        if (params.combineUnderNChars !== undefined) {
-          formData.append('combine_under_n_chars', String(params.combineUnderNChars))
-        }
-        if (params.newAfterNChars !== undefined) {
-          formData.append('new_after_n_chars', String(params.newAfterNChars))
-        }
-        if (params.overlap !== undefined) {
-          formData.append('overlap', String(params.overlap))
-        }
-        if (params.overlapAll !== undefined) {
-          formData.append('overlap_all', String(params.overlapAll))
+        // Prepare partition parameters using the official client structure
+        const partitionParams = {
+          files: {
+            content: fileBuffer,
+            fileName: fileName
+          },
+          strategy: strategyMapping[params.strategy] || Strategy.Fast,
+          chunkingStrategy: params.chunkingStrategy,
+          coordinates: params.coordinates,
+          includePageBreaks: params.includePageBreaks,
+          pdfInferTableStructure: params.pdfInferTableStructure,
+          languages: params.languages,
+          // Chunking parameters
+          maxCharacters: params.maxCharacters,
+          combineUnderNChars: params.combineUnderNChars,
+          newAfterNChars: params.newAfterNChars,
+          overlap: params.overlap,
+          overlapAll: params.overlapAll
         }
 
-        // Correct endpoint for Unstructured.io hosted API
-        // Pass FormData headers to ensure proper multipart boundary
-        const response = await this.httpClient.post('/general/v0/general', formData, {
-          headers: {
-            ...formData.getHeaders()
+        // Remove undefined values to avoid sending empty parameters
+        Object.keys(partitionParams).forEach((key) => {
+          if (partitionParams[key as keyof typeof partitionParams] === undefined) {
+            delete partitionParams[key as keyof typeof partitionParams]
           }
         })
 
+        // Use the official client to process the document
+        const response: PartitionResponse = await this.client.general.partition({
+          partitionParameters: partitionParams
+        })
+
         const processingTime = Date.now() - startTime
-        const elements = this.transformResponse(response.data)
+
+        // The official client handles status codes internally and throws errors for failures
+        // Extract elements from response - the response structure contains the elements directly
+        const elements = this.transformResponse(response as unknown as UnstructuredApiElement[])
 
         logger.info('Document processing completed', {
           fileName,
@@ -249,128 +236,94 @@ export class UnstructuredApiClient {
    * Classify API errors for retry logic
    */
   private classifyError(error: Error): UnstructuredError {
-    const isAxiosError = axios.isAxiosError(error)
-
-    if (isAxiosError && error.response) {
-      const status = error.response.status
-      const message = error.response.data?.message || error.message
-
-      switch (status) {
-        case 401:
-          return {
-            type: 'authentication_error',
-            message: 'Invalid API key or authentication failed',
-            code: String(status),
-            retryable: false,
-            timestamp: new Date()
-          }
-        case 413:
-          return {
-            type: 'file_too_large',
-            message: 'File size exceeds API limits',
-            code: String(status),
-            retryable: false,
-            timestamp: new Date()
-          }
-        case 422:
-          return {
-            type: 'invalid_format',
-            message: 'Unsupported file format or corrupted file',
-            code: String(status),
-            retryable: false,
-            timestamp: new Date()
-          }
-        case 429:
-          // Extract Retry-After header if present (in seconds)
-          const retryAfter = error.response.headers['retry-after']
-          const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : undefined
-
-          return {
-            type: 'quota_exceeded',
-            message: 'API rate limit or quota exceeded',
-            code: String(status),
-            retryable: true,
-            timestamp: new Date(),
-            details: retryAfterSeconds ? { retryAfter: retryAfterSeconds } : undefined
-          }
-        case 500:
-        case 502:
-        case 503:
-        case 504:
-          return {
-            type: 'server_error',
-            message: 'Server error, retrying may help',
-            code: String(status),
-            retryable: true,
-            timestamp: new Date()
-          }
-        default:
-          return {
-            type: 'unknown',
-            message: message,
-            code: String(status),
-            retryable: status >= 500,
-            timestamp: new Date()
-          }
+    // Handle SDK-specific errors
+    if (error.message.includes('status 401') || error.message.includes('Unauthorized')) {
+      return {
+        type: 'authentication_error',
+        message: 'Invalid API key or authentication failed',
+        code: '401',
+        retryable: false,
+        timestamp: new Date()
       }
     }
 
-    if (isAxiosError && error.code === 'ECONNABORTED') {
+    if (error.message.includes('status 413') || error.message.includes('Payload Too Large')) {
+      return {
+        type: 'file_too_large',
+        message: 'File size exceeds API limits',
+        code: '413',
+        retryable: false,
+        timestamp: new Date()
+      }
+    }
+
+    if (error.message.includes('status 422') || error.message.includes('Unprocessable Entity')) {
+      return {
+        type: 'invalid_format',
+        message: 'Unsupported file format or corrupted file',
+        code: '422',
+        retryable: false,
+        timestamp: new Date()
+      }
+    }
+
+    if (error.message.includes('status 429') || error.message.includes('Too Many Requests')) {
+      return {
+        type: 'quota_exceeded',
+        message: 'API rate limit or quota exceeded',
+        code: '429',
+        retryable: true,
+        timestamp: new Date()
+      }
+    }
+
+    if (
+      error.message.includes('status 5') ||
+      error.message.includes('Internal Server Error') ||
+      error.message.includes('Bad Gateway') ||
+      error.message.includes('Service Unavailable') ||
+      error.message.includes('Gateway Timeout')
+    ) {
+      return {
+        type: 'server_error',
+        message: 'Server error, retrying may help',
+        code: '500',
+        retryable: true,
+        timestamp: new Date()
+      }
+    }
+
+    if (error.message.includes('timeout') || error.message.includes('ECONNABORTED')) {
       return {
         type: 'timeout',
         message: 'Request timeout',
-        code: error.code,
+        code: 'TIMEOUT',
         retryable: true,
         timestamp: new Date()
       }
     }
 
-    if (isAxiosError && (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND')) {
+    if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
       return {
         type: 'network_error',
         message: 'Network connection failed',
-        code: error.code,
+        code: 'NETWORK_ERROR',
         retryable: true,
         timestamp: new Date()
       }
     }
+
+    // Extract status code from error message if available
+    const statusMatch = error.message.match(/status (\d+)/)
+    const status = statusMatch ? parseInt(statusMatch[1], 10) : undefined
 
     return {
       type: 'unknown',
       message: error.message,
-      retryable: false,
+      code: status ? String(status) : 'UNKNOWN',
+      retryable: status ? status >= 500 : false,
       timestamp: new Date()
     }
-  }
-
-  /**
-   * Get MIME type based on file extension
-   */
-  private getMimeType(fileName: string): string {
-    const extension = fileName.split('.').pop()?.toLowerCase()
-
-    const mimeTypes: Record<string, string> = {
-      pdf: 'application/pdf',
-      doc: 'application/msword',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      xls: 'application/vnd.ms-excel',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      ppt: 'application/vnd.ms-powerpoint',
-      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      txt: 'text/plain',
-      rtf: 'application/rtf',
-      html: 'text/html',
-      htm: 'text/html',
-      csv: 'text/csv',
-      xml: 'application/xml',
-      json: 'application/json',
-      md: 'text/markdown',
-      odt: 'application/vnd.oasis.opendocument.text',
-      ods: 'application/vnd.oasis.opendocument.spreadsheet',
-      odp: 'application/vnd.oasis.opendocument.presentation'
-    }
-
-    return mimeTypes[extension || ''] || 'application/octet-stream'
   }
 
   /**
@@ -383,15 +336,35 @@ export class UnstructuredApiClient {
   /**
    * Test connection to Unstructured.io API
    * Note: The hosted API doesn't have a dedicated health endpoint,
-   * so we just verify the base URL is reachable
+   * so we test with a minimal partition request
    */
   async testConnection(): Promise<boolean> {
     try {
-      // Try to reach the base URL - if it responds (even with 404), server is reachable
-      const response = await this.httpClient.get('/', { validateStatus: () => true })
-      return response.status < 500
+      // Create a minimal test buffer to verify API connectivity
+      const testBuffer = Buffer.from('test', 'utf-8')
+
+      // Attempt a minimal partition request to test connectivity
+      await this.client.general.partition({
+        partitionParameters: {
+          files: {
+            content: testBuffer,
+            fileName: 'test.txt'
+          },
+          strategy: Strategy.Fast,
+          maxCharacters: 100
+        }
+      })
+
+      return true
     } catch (error) {
-      logger.error('Connection test failed', { error })
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      logger.error('Connection test failed', { error: errorMessage })
+
+      // If we get an authentication error, the connection is working but auth is wrong
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        return true
+      }
+
       return false
     }
   }
@@ -400,15 +373,15 @@ export class UnstructuredApiClient {
    * Get API health status
    */
   async getHealthStatus(): Promise<{ healthy: boolean; message?: string }> {
-    try {
-      const response = await this.httpClient.get('/health')
-      return { healthy: response.status === 200 }
-    } catch (error) {
-      const unstructuredError = this.classifyError(error as Error)
+    const connectionWorking = await this.testConnection()
+
+    if (!connectionWorking) {
       return {
         healthy: false,
-        message: unstructuredError.message
+        message: 'Unable to connect to Unstructured API'
       }
     }
+
+    return { healthy: true }
   }
 }

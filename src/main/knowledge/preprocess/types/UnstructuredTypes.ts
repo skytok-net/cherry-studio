@@ -32,7 +32,7 @@ export interface UnstructuredConfig {
 export interface ProcessingParams {
   strategy: 'fast' | 'hi_res' | 'auto'
   chunkingStrategy: string
-  outputFormat: string
+  // outputFormat removed - official client returns JSON by default
   includePageBreaks: boolean
   coordinates: boolean
   pdfInferTableStructure: boolean

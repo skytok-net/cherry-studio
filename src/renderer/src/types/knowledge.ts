@@ -120,8 +120,11 @@ export const isPreprocessProviderId = (id: string): id is PreprocessProviderId =
 
 // Unstructured.io specific options
 export interface UnstructuredOptions {
+  deploymentType?: 'hosted' | 'self-hosted'
   processingMode?: 'auto' | 'fast' | 'hi_res'
   chunkingStrategy?: 'by_title' | 'by_page' | 'by_similarity' | 'basic'
+  maxRetries?: number
+  timeoutMs?: number
   maxCharacters?: number
   combineUnderNChars?: number
   newAfterNChars?: number

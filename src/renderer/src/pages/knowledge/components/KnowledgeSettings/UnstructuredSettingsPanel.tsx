@@ -1,6 +1,6 @@
 import { InfoTooltip } from '@renderer/components/TooltipIcons'
 import type { UnstructuredOptions } from '@renderer/types'
-import { Checkbox, InputNumber, Select } from 'antd'
+import { Checkbox, Input, InputNumber, Select } from 'antd'
 import { useTranslation } from 'react-i18next'
 
 import { SettingsItem, SettingsPanel } from './styles'
@@ -38,6 +38,22 @@ const UnstructuredSettingsPanel: React.FC<UnstructuredSettingsPanelProps> = ({ o
 
       <SettingsItem>
         <div className="settings-label">
+          {t('knowledge.unstructured.deployment_type')}
+          <InfoTooltip title={t('knowledge.unstructured.deployment_type_tooltip')} placement="right" />
+        </div>
+        <Select
+          style={{ width: '100%' }}
+          value={options.deploymentType || 'hosted'}
+          onChange={(value) => updateOption('deploymentType', value)}
+          options={[
+            { label: t('knowledge.unstructured.deployment_hosted'), value: 'hosted' },
+            { label: t('knowledge.unstructured.deployment_self_hosted'), value: 'self-hosted' }
+          ]}
+        />
+      </SettingsItem>
+
+      <SettingsItem>
+        <div className="settings-label">
           {t('knowledge.unstructured.chunking_strategy')}
           <InfoTooltip title={t('knowledge.unstructured.chunking_strategy_tooltip')} placement="right" />
         </div>
@@ -51,6 +67,37 @@ const UnstructuredSettingsPanel: React.FC<UnstructuredSettingsPanelProps> = ({ o
             { label: t('knowledge.unstructured.chunking_by_similarity'), value: 'by_similarity' },
             { label: t('knowledge.unstructured.chunking_basic'), value: 'basic' }
           ]}
+        />
+      </SettingsItem>
+
+      <SettingsItem>
+        <div className="settings-label">
+          {t('knowledge.unstructured.max_retries')}
+          <InfoTooltip title={t('knowledge.unstructured.max_retries_tooltip')} placement="right" />
+        </div>
+        <InputNumber
+          style={{ width: '100%' }}
+          min={1}
+          max={10}
+          value={options.maxRetries || 3}
+          onChange={(value) => updateOption('maxRetries', value || undefined)}
+          placeholder="3"
+        />
+      </SettingsItem>
+
+      <SettingsItem>
+        <div className="settings-label">
+          {t('knowledge.unstructured.timeout_ms')}
+          <InfoTooltip title={t('knowledge.unstructured.timeout_ms_tooltip')} placement="right" />
+        </div>
+        <InputNumber
+          style={{ width: '100%' }}
+          min={5000}
+          max={300000}
+          step={5000}
+          value={options.timeoutMs || 30000}
+          onChange={(value) => updateOption('timeoutMs', value || undefined)}
+          placeholder="30000"
         />
       </SettingsItem>
 
@@ -71,6 +118,36 @@ const UnstructuredSettingsPanel: React.FC<UnstructuredSettingsPanelProps> = ({ o
 
       <SettingsItem>
         <div className="settings-label">
+          {t('knowledge.unstructured.combine_under_n_chars')}
+          <InfoTooltip title={t('knowledge.unstructured.combine_under_n_chars_tooltip')} placement="right" />
+        </div>
+        <InputNumber
+          style={{ width: '100%' }}
+          min={50}
+          max={5000}
+          value={options.combineUnderNChars}
+          onChange={(value) => updateOption('combineUnderNChars', value || undefined)}
+          placeholder="Auto"
+        />
+      </SettingsItem>
+
+      <SettingsItem>
+        <div className="settings-label">
+          {t('knowledge.unstructured.new_after_n_chars')}
+          <InfoTooltip title={t('knowledge.unstructured.new_after_n_chars_tooltip')} placement="right" />
+        </div>
+        <InputNumber
+          style={{ width: '100%' }}
+          min={100}
+          max={8000}
+          value={options.newAfterNChars}
+          onChange={(value) => updateOption('newAfterNChars', value || undefined)}
+          placeholder="Auto"
+        />
+      </SettingsItem>
+
+      <SettingsItem>
+        <div className="settings-label">
           {t('knowledge.unstructured.overlap')}
           <InfoTooltip title={t('knowledge.unstructured.overlap_tooltip')} placement="right" />
         </div>
@@ -82,6 +159,13 @@ const UnstructuredSettingsPanel: React.FC<UnstructuredSettingsPanelProps> = ({ o
           onChange={(value) => updateOption('overlap', value || undefined)}
           placeholder="0"
         />
+      </SettingsItem>
+
+      <SettingsItem>
+        <Checkbox checked={options.overlapAll || false} onChange={(e) => updateOption('overlapAll', e.target.checked)}>
+          {t('knowledge.unstructured.overlap_all')}
+        </Checkbox>
+        <InfoTooltip title={t('knowledge.unstructured.overlap_all_tooltip')} placement="right" />
       </SettingsItem>
 
       <SettingsItem>
@@ -109,6 +193,28 @@ const UnstructuredSettingsPanel: React.FC<UnstructuredSettingsPanelProps> = ({ o
           {t('knowledge.unstructured.coordinates')}
         </Checkbox>
         <InfoTooltip title={t('knowledge.unstructured.coordinates_tooltip')} placement="right" />
+      </SettingsItem>
+
+      <SettingsItem>
+        <div className="settings-label">
+          {t('knowledge.unstructured.languages')}
+          <InfoTooltip title={t('knowledge.unstructured.languages_tooltip')} placement="right" />
+        </div>
+        <Input
+          style={{ width: '100%' }}
+          value={options.languages?.join(', ') || ''}
+          onChange={(e) => {
+            const value = e.target.value.trim()
+            const languages = value
+              ? value
+                  .split(',')
+                  .map((lang) => lang.trim())
+                  .filter((lang) => lang.length > 0)
+              : undefined
+            updateOption('languages', languages)
+          }}
+          placeholder="eng, spa, fra (comma-separated)"
+        />
       </SettingsItem>
     </SettingsPanel>
   )

@@ -152,7 +152,7 @@ export default class UnstructuredPreprocessProvider extends BasePreprocessProvid
     return {
       strategy: this.config.processingMode,
       chunkingStrategy: this.config.chunkingStrategy,
-      outputFormat: 'application/json',
+      // Remove outputFormat - official client returns JSON by default
       includePageBreaks: this.config.includePageBreaks ?? false,
       coordinates: this.config.coordinates ?? false,
       pdfInferTableStructure: this.config.pdfInferTableStructure ?? false,
