@@ -118,13 +118,28 @@ export const isPreprocessProviderId = (id: string): id is PreprocessProviderId =
   return Object.hasOwn(PreprocessProviderIds, id)
 }
 
+// Unstructured.io specific options
+export interface UnstructuredOptions {
+  processingMode?: 'auto' | 'fast' | 'hi_res'
+  chunkingStrategy?: 'by_title' | 'by_page' | 'by_similarity' | 'basic'
+  maxCharacters?: number
+  combineUnderNChars?: number
+  newAfterNChars?: number
+  overlap?: number
+  overlapAll?: boolean
+  languages?: string[]
+  coordinates?: boolean
+  includePageBreaks?: boolean
+  pdfInferTableStructure?: boolean
+}
+
 export interface PreprocessProvider {
   id: PreprocessProviderId
   name: string
   apiKey?: string
   apiHost?: string
   model?: string
-  options?: any
+  options?: UnstructuredOptions | any // Typed for unstructured, generic for others
   quota?: number
 }
 

@@ -2,6 +2,7 @@ import { loggerService } from '@logger'
 import type { AxiosInstance } from 'axios'
 import axios from 'axios'
 import Bottleneck from 'bottleneck'
+import FormDataNode from 'form-data'
 
 import type {
   BoundingBox,
@@ -72,22 +73,20 @@ export class UnstructuredApiClient {
           params
         })
 
-        const formData = new FormData()
+        const formData = new FormDataNode()
         const mimeType = this.getMimeType(fileName)
-        formData.append('files', new Blob([fileBuffer], { type: mimeType }), fileName)
+        // Use form-data package for Node.js - pass buffer with metadata
+        formData.append('files', fileBuffer, {
+          filename: fileName,
+          contentType: mimeType
+        })
         formData.append('strategy', params.strategy)
         formData.append('chunking_strategy', params.chunkingStrategy)
         formData.append('output_format', 'application/json')
 
-        // Optional parameters
+        // Optional parameters - only include those supported by the API
         if (params.includePageBreaks) {
           formData.append('include_page_breaks', 'true')
-        }
-        if (params.extractImages) {
-          formData.append('extract_images', 'true')
-        }
-        if (params.extractTables) {
-          formData.append('extract_tables', 'true')
         }
         if (params.coordinates) {
           formData.append('coordinates', 'true')
@@ -102,9 +101,30 @@ export class UnstructuredApiClient {
           })
         }
 
-        // Let the browser/Node.js automatically set Content-Type with proper boundary
+        // Chunking parameters
+        if (params.maxCharacters !== undefined) {
+          formData.append('max_characters', String(params.maxCharacters))
+        }
+        if (params.combineUnderNChars !== undefined) {
+          formData.append('combine_under_n_chars', String(params.combineUnderNChars))
+        }
+        if (params.newAfterNChars !== undefined) {
+          formData.append('new_after_n_chars', String(params.newAfterNChars))
+        }
+        if (params.overlap !== undefined) {
+          formData.append('overlap', String(params.overlap))
+        }
+        if (params.overlapAll !== undefined) {
+          formData.append('overlap_all', String(params.overlapAll))
+        }
+
         // Correct endpoint for Unstructured.io hosted API
-        const response = await this.httpClient.post('/general/v0/general', formData)
+        // Pass FormData headers to ensure proper multipart boundary
+        const response = await this.httpClient.post('/general/v0/general', formData, {
+          headers: {
+            ...formData.getHeaders()
+          }
+        })
 
         const processingTime = Date.now() - startTime
         const elements = this.transformResponse(response.data)
@@ -134,8 +154,21 @@ export class UnstructuredApiClient {
           throw new Error(`Unstructured.io processing failed: ${unstructuredError.message}`)
         }
 
-        // Exponential backoff for retry
-        const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 30000)
+        // Calculate backoff delay
+        let backoffMs: number
+
+        // For 429 rate limit errors, respect Retry-After header if present
+        if (unstructuredError.type === 'quota_exceeded' && unstructuredError.details?.retryAfter) {
+          backoffMs = unstructuredError.details.retryAfter * 1000 // Convert seconds to ms
+          logger.info(`Rate limit hit, respecting Retry-After header: ${unstructuredError.details.retryAfter}s`, {
+            fileName,
+            attempt: retryCount + 1
+          })
+        } else {
+          // Exponential backoff for other retryable errors
+          backoffMs = Math.min(1000 * Math.pow(2, retryCount), 30000)
+        }
+
         logger.info(`Retrying after ${backoffMs}ms backoff`, { fileName, attempt: retryCount + 1 })
 
         await this.delay(backoffMs)
@@ -248,12 +281,17 @@ export class UnstructuredApiClient {
             timestamp: new Date()
           }
         case 429:
+          // Extract Retry-After header if present (in seconds)
+          const retryAfter = error.response.headers['retry-after']
+          const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : undefined
+
           return {
             type: 'quota_exceeded',
             message: 'API rate limit or quota exceeded',
             code: String(status),
             retryable: true,
-            timestamp: new Date()
+            timestamp: new Date(),
+            details: retryAfterSeconds ? { retryAfter: retryAfterSeconds } : undefined
           }
         case 500:
         case 502:
@@ -344,11 +382,14 @@ export class UnstructuredApiClient {
 
   /**
    * Test connection to Unstructured.io API
+   * Note: The hosted API doesn't have a dedicated health endpoint,
+   * so we just verify the base URL is reachable
    */
   async testConnection(): Promise<boolean> {
     try {
-      const response = await this.httpClient.get('/general/v0/general/docs')
-      return response.status === 200
+      // Try to reach the base URL - if it responds (even with 404), server is reachable
+      const response = await this.httpClient.get('/', { validateStatus: () => true })
+      return response.status < 500
     } catch (error) {
       logger.error('Connection test failed', { error })
       return false

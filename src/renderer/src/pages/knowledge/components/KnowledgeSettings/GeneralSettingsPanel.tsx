@@ -5,12 +5,13 @@ import { DEFAULT_KNOWLEDGE_DOCUMENT_COUNT } from '@renderer/config/constant'
 import { isEmbeddingModel, isRerankModel } from '@renderer/config/models'
 import { useProviders } from '@renderer/hooks/useProvider'
 import { getModelUniqId } from '@renderer/services/ModelService'
-import type { KnowledgeBase, PreprocessProvider } from '@renderer/types'
+import type { KnowledgeBase, PreprocessProvider, UnstructuredOptions } from '@renderer/types'
 import type { SelectProps } from 'antd'
 import { Input, Select, Slider } from 'antd'
 import { useTranslation } from 'react-i18next'
 
 import { SettingsItem, SettingsPanel } from './styles'
+import UnstructuredSettingsPanel from './UnstructuredSettingsPanel'
 
 interface GeneralSettingsPanelProps {
   newBase: KnowledgeBase
@@ -62,6 +63,27 @@ const GeneralSettingsPanel: React.FC<GeneralSettingsPanelProps> = ({
           allowClear
         />
       </SettingsItem>
+
+      {/* Show Unstructured.io-specific settings when it's selected */}
+      {selectedDocPreprocessProvider?.id === 'unstructured' && (
+        <UnstructuredSettingsPanel
+          options={(selectedDocPreprocessProvider?.options as UnstructuredOptions) || {}}
+          onChange={(options) => {
+            if (newBase.preprocessProvider?.provider) {
+              setNewBase((prev) => ({
+                ...prev,
+                preprocessProvider: {
+                  ...prev.preprocessProvider!,
+                  provider: {
+                    ...prev.preprocessProvider!.provider,
+                    options
+                  }
+                }
+              }))
+            }
+          }}
+        />
+      )}
 
       <SettingsItem>
         <div className="settings-label">

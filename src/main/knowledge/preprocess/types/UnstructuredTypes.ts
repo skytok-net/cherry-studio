@@ -11,23 +11,38 @@ export interface UnstructuredConfig {
   deploymentType: 'hosted' | 'self-hosted'
   apiEndpoint: string
   apiKey?: string
-  processingMode: 'fast' | 'hi_res'
+  processingMode: 'fast' | 'hi_res' | 'auto'
   chunkingStrategy: 'by_title' | 'by_page' | 'by_similarity' | 'basic'
   outputFormat: 'text' | 'markdown' | 'json'
   maxRetries: number
   timeoutMs: number
+  // Chunking parameters
+  maxCharacters?: number // Default: 500. Hard maximum for chunk size
+  combineUnderNChars?: number // Default: same as maxCharacters. Combine small chunks
+  newAfterNChars?: number // Soft limit for starting new chunks
+  overlap?: number // Default: 0. Character overlap between chunks
+  overlapAll?: boolean // Default: false. Apply overlap to all chunks
+  // Extraction parameters
+  languages?: string[] // e.g., ['eng', 'spa']. Languages for OCR
+  coordinates?: boolean // Default: false. Include bounding box coordinates
+  includePageBreaks?: boolean // Default: false. Include page break markers
+  pdfInferTableStructure?: boolean // Default: false. Infer table structure in PDFs
 }
 
 export interface ProcessingParams {
-  strategy: 'fast' | 'hi_res'
+  strategy: 'fast' | 'hi_res' | 'auto'
   chunkingStrategy: string
   outputFormat: string
   includePageBreaks: boolean
-  extractImages: boolean
-  extractTables: boolean
   coordinates: boolean
   pdfInferTableStructure: boolean
   languages?: string[]
+  // Chunking parameters
+  maxCharacters?: number
+  combineUnderNChars?: number
+  newAfterNChars?: number
+  overlap?: number
+  overlapAll?: boolean
 }
 
 export interface ProcessedElement {

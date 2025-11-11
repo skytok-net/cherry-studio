@@ -26,11 +26,22 @@ export default class UnstructuredPreprocessProvider extends BasePreprocessProvid
       deploymentType: (provider.options?.deploymentType as 'hosted' | 'self-hosted') || 'hosted',
       apiEndpoint: provider.apiHost || 'https://api.unstructuredapp.io',
       apiKey: provider.apiKey,
-      processingMode: (provider.options?.processingMode as 'fast' | 'hi_res') || 'fast',
+      processingMode: (provider.options?.processingMode as 'fast' | 'hi_res' | 'auto') || 'fast',
       chunkingStrategy: (provider.options?.chunkingStrategy as any) || 'by_title',
       outputFormat: (provider.options?.outputFormat as 'text' | 'markdown' | 'json') || 'text',
       maxRetries: provider.options?.maxRetries || 3,
-      timeoutMs: provider.options?.timeoutMs || 30000
+      timeoutMs: provider.options?.timeoutMs || 30000,
+      // Chunking parameters from UI
+      maxCharacters: provider.options?.maxCharacters,
+      combineUnderNChars: provider.options?.combineUnderNChars,
+      newAfterNChars: provider.options?.newAfterNChars,
+      overlap: provider.options?.overlap,
+      overlapAll: provider.options?.overlapAll,
+      // Extraction parameters from UI
+      languages: provider.options?.languages,
+      coordinates: provider.options?.coordinates,
+      includePageBreaks: provider.options?.includePageBreaks,
+      pdfInferTableStructure: provider.options?.pdfInferTableStructure
     }
 
     this.apiClient = new UnstructuredApiClient(this.config)
@@ -38,7 +49,9 @@ export default class UnstructuredPreprocessProvider extends BasePreprocessProvid
     logger.info('UnstructuredPreprocessProvider initialized', {
       deploymentType: this.config.deploymentType,
       processingMode: this.config.processingMode,
-      chunkingStrategy: this.config.chunkingStrategy
+      chunkingStrategy: this.config.chunkingStrategy,
+      maxCharacters: this.config.maxCharacters,
+      overlap: this.config.overlap
     })
   }
 
@@ -140,12 +153,16 @@ export default class UnstructuredPreprocessProvider extends BasePreprocessProvid
       strategy: this.config.processingMode,
       chunkingStrategy: this.config.chunkingStrategy,
       outputFormat: 'application/json',
-      includePageBreaks: true,
-      extractImages: false, // Can be made configurable
-      extractTables: true,
-      coordinates: false,
-      pdfInferTableStructure: true,
-      languages: undefined // Auto-detect
+      includePageBreaks: this.config.includePageBreaks ?? false,
+      coordinates: this.config.coordinates ?? false,
+      pdfInferTableStructure: this.config.pdfInferTableStructure ?? false,
+      languages: this.config.languages,
+      // Chunking parameters with sensible defaults
+      maxCharacters: this.config.maxCharacters ?? 500,
+      combineUnderNChars: this.config.combineUnderNChars,
+      newAfterNChars: this.config.newAfterNChars,
+      overlap: this.config.overlap ?? 0,
+      overlapAll: this.config.overlapAll ?? false
     }
   }
 
