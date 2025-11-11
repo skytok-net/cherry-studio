@@ -32,7 +32,7 @@ const MCPResourcesSection = ({ resources }: MCPResourcesSectionProps) => {
       <Descriptions column={1} size="small" bordered>
         {resource.mimeType && (
           <Descriptions.Item label={t('settings.mcp.resources.mimeType') || 'MIME Type'}>
-            <Tag color="blue">{resource.mimeType}</Tag>
+            <Tag color="var(--color-secondary-beige-dark, #D2B48C)">{resource.mimeType}</Tag>
           </Descriptions.Item>
         )}
         {resource.size !== undefined && (

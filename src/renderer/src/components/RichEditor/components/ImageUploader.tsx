@@ -32,12 +32,12 @@ const UrlInput = styled(Input)`
     background: #ffffff
 
     &:hover {
-      border-color: #4285f4
+      border-color: var(--color-primary-flame, #FF6B35)
     }
 
     &:focus {
-      border-color: #4285f4
-      box-shadow: 0 0 0 1px rgba(66, 133, 244, 0.3)
+      border-color: var(--color-primary-flame, #FF6B35)
+      box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.3)
     }
   }
 `

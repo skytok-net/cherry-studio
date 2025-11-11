@@ -164,7 +164,7 @@ const IconWrapper = styled.div<{ $isStreaming: boolean }>`
   background: ${(props) =>
     props.$isStreaming
       ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-      : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'};
+      : 'linear-gradient(135deg, #FF8A5C 0%, #FF6B35 100%)'};
   border-radius: 12px;
   color: white;
   box-shadow: ${(props) =>

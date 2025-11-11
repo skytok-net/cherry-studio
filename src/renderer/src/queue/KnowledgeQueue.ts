@@ -20,6 +20,8 @@ const logger = loggerService.withContext('KnowledgeQueue')
 class KnowledgeQueue {
   private processing: Map<string, boolean> = new Map()
   private readonly MAX_RETRIES = 1
+  private failureCount: Map<string, number> = new Map()
+  private readonly MAX_CONSECUTIVE_FAILURES = 3
 
   public async checkAllBases(): Promise<void> {
     const state = store.getState()
@@ -97,6 +99,32 @@ class KnowledgeQueue {
   private async processItem(baseId: string, item: KnowledgeItem): Promise<void> {
     const notificationService = NotificationService.getInstance()
     const userId = getStoreSetting('userId')
+
+    // Circuit breaker: check for consecutive failures
+    const currentFailures = this.failureCount.get(baseId) || 0
+    if (currentFailures >= this.MAX_CONSECUTIVE_FAILURES) {
+      logger.warn(
+        `Circuit breaker activated for base ${baseId}: ${currentFailures} consecutive failures. Stopping processing.`
+      )
+      this.stopProcessing(baseId)
+
+      notificationService.send({
+        id: uuid(),
+        type: 'error',
+        title: t('common.knowledge_base'),
+        message:
+          t('notification.knowledge.circuit_breaker', {
+            failures: currentFailures,
+            baseId: baseId.substring(0, 8)
+          }) ||
+          `Knowledge base processing stopped after ${currentFailures} consecutive failures. Please check your embedding configuration.`,
+        silent: false,
+        timestamp: Date.now(),
+        source: 'knowledge'
+      })
+      return
+    }
+
     try {
       if (item.retryCount && item.retryCount >= this.MAX_RETRIES) {
         logger.info(`Item ${item.id} has reached max retries, skipping`)
@@ -207,16 +235,30 @@ class KnowledgeQueue {
       }
       logger.info(`Updated uniqueId for item ${item.id} in base ${baseId} `)
 
+      // Reset failure count on success
+      this.failureCount.set(baseId, 0)
+
       store.dispatch(clearCompletedProcessing({ baseId }))
     } catch (error) {
       logger.error(`Error processing item ${item.id}: `, error as Error)
+
+      // Increment failure count for circuit breaker
+      const currentFailures = (this.failureCount.get(baseId) || 0) + 1
+      this.failureCount.set(baseId, currentFailures)
+
+      logger.warn(`Processing failure ${currentFailures}/${this.MAX_CONSECUTIVE_FAILURES} for base ${baseId}`)
+
+      // Enhanced error message for embedding failures
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      if (errorMessage.includes('422') && errorMessage.includes('Embedding Failed')) {
+        errorMessage = `Embedding API error: Please check your model configuration and API key. ${errorMessage}`
+      }
+
       notificationService.send({
         id: uuid(),
         type: 'error',
         title: t('common.knowledge_base'),
-        message: t('notification.knowledge.error', {
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }),
+        message: t('notification.knowledge.error', { error: errorMessage }),
         silent: false,
         timestamp: Date.now(),
         source: 'knowledge'
@@ -227,7 +269,7 @@ class KnowledgeQueue {
           baseId,
           itemId: item.id,
           status: 'failed',
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: errorMessage,
           retryCount: (item.retryCount || 0) + 1
         })
       )

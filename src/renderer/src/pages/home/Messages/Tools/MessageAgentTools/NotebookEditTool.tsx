@@ -19,7 +19,7 @@ export function NotebookEditTool({
     label: (
       <>
         <ToolTitle icon={<FileText className="h-4 w-4" />} label="NotebookEdit" />
-        <Tag className="mt-1" color="blue">
+        <Tag className="mt-1" color="var(--color-secondary-beige-dark, #D2B48C)">
           {input.notebook_path}{' '}
         </Tag>
       </>

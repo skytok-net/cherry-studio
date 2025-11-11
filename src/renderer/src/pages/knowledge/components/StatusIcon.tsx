@@ -94,7 +94,11 @@ const StatusDot = styled.div<{ $status: 'pending' | 'processing' | 'new' }>`
   height: 10px;
   border-radius: 50%;
   background-color: ${(props) =>
-    props.$status === 'pending' ? '#faad14' : props.$status === 'new' ? '#918999' : '#1890ff'};
+    props.$status === 'pending'
+      ? '#faad14'
+      : props.$status === 'new'
+        ? '#918999'
+        : 'var(--color-primary-flame, #FF6B35)'};
   animation: ${(props) => (props.$status === 'processing' ? 'pulse 2s infinite' : 'none')};
   cursor: pointer;
 

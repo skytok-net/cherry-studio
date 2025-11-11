@@ -24,7 +24,7 @@ const MentionModelsInput: FC<{
         {selectedModels.map((model) => (
           <CustomTag
             icon={<i className="iconfont icon-at" />}
-            color="#1677ff"
+            color="var(--color-primary-flame, #FF6B35)"
             key={getModelUniqId(model)}
             closable
             onClose={() => onRemoveModel(model)}>

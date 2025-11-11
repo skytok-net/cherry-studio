@@ -1,0 +1,506 @@
+openapi: 3.0.3
+info:
+  title: Cherry Studio Internal IPC API
+  description: Electron IPC contracts for Unstructured.io preprocessing provider
+  version: 1.0.0
+
+paths:
+  /preprocess/unstructured/process:
+    post:
+      summary: Process document using Unstructured.io provider
+      description: Internal IPC endpoint for document processing
+      operationId: processDocumentInternal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sourceId
+                - fileMetadata
+                - processingParams
+              properties:
+                sourceId:
+                  type: string
+                  description: Knowledge base item identifier
+                fileMetadata:
+                  $ref: '#/components/schemas/FileMetadata'
+                processingParams:
+                  $ref: '#/components/schemas/ProcessingParams'
+                configOverrides:
+                  $ref: '#/components/schemas/ConfigOverrides'
+      responses:
+        '200':
+          description: Processing completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobResult'
+        '400':
+          description: Invalid request parameters
+        '429':
+          description: Processing queue full
+        '500':
+          description: Processing failed
+
+  /preprocess/unstructured/status:
+    get:
+      summary: Get processing job status
+      parameters:
+        - name: jobId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Processing job identifier
+      responses:
+        '200':
+          description: Job status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobStatus'
+
+  /preprocess/unstructured/config/validate:
+    post:
+      summary: Validate Unstructured.io configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnstructuredConfig'
+      responses:
+        '200':
+          description: Configuration is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  version:
+                    type: string
+                  capabilities:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Configuration is invalid
+
+  /preprocess/unstructured/usage:
+    get:
+      summary: Get usage metrics
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Usage metrics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageMetrics'
+
+components:
+  schemas:
+    FileMetadata:
+      type: object
+      required:
+        - path
+        - name
+        - size
+        - type
+      properties:
+        path:
+          type: string
+          description: File system path
+        name:
+          type: string
+          description: Original filename
+        size:
+          type: integer
+          description: File size in bytes
+        type:
+          type: string
+          description: MIME type
+        hash:
+          type: string
+          description: SHA-256 hash of file content
+        lastModified:
+          type: string
+          format: date-time
+          description: Last modification timestamp
+
+    ProcessingParams:
+      type: object
+      properties:
+        strategy:
+          type: string
+          enum: [fast, hi_res]
+          default: fast
+          description: Processing quality mode
+        chunkingStrategy:
+          type: string
+          enum: [by_title, by_page, by_similarity, basic]
+          default: basic
+          description: Text chunking approach
+        outputFormat:
+          type: string
+          enum: [text, markdown, json]
+          default: text
+          description: Output format preference
+        includePageBreaks:
+          type: boolean
+          default: false
+          description: Include page break markers
+        extractImages:
+          type: boolean
+          default: false
+          description: Extract and describe images
+        extractTables:
+          type: boolean
+          default: true
+          description: Extract table structure
+        coordinates:
+          type: boolean
+          default: false
+          description: Include spatial coordinates
+        pdfInferTableStructure:
+          type: boolean
+          default: true
+          description: Infer table structure in PDFs
+        languages:
+          type: array
+          items:
+            type: string
+          description: Expected document languages
+
+    ConfigOverrides:
+      type: object
+      properties:
+        maxRetries:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: Override maximum retry attempts
+        timeoutMs:
+          type: integer
+          minimum: 5000
+          maximum: 300000
+          description: Override request timeout
+
+    UnstructuredConfig:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - deploymentType
+        - apiEndpoint
+      properties:
+        id:
+          type: string
+          enum: [unstructured]
+          description: Provider identifier
+        name:
+          type: string
+          description: Display name
+        type:
+          type: string
+          enum: [preprocess]
+          description: Provider type
+        deploymentType:
+          type: string
+          enum: [hosted, self-hosted]
+          description: Deployment mode
+        apiEndpoint:
+          type: string
+          format: uri
+          description: API endpoint URL
+        apiKey:
+          type: string
+          description: API key (required for hosted)
+        processingMode:
+          type: string
+          enum: [fast, hi_res]
+          default: fast
+          description: Default processing mode
+        chunkingStrategy:
+          type: string
+          enum: [by_title, by_page, by_similarity, basic]
+          default: basic
+          description: Default chunking strategy
+        outputFormat:
+          type: string
+          enum: [text, markdown, json]
+          default: text
+          description: Default output format
+        maxRetries:
+          type: integer
+          minimum: 0
+          maximum: 10
+          default: 3
+          description: Maximum retry attempts
+        timeoutMs:
+          type: integer
+          minimum: 5000
+          maximum: 300000
+          default: 30000
+          description: Request timeout in milliseconds
+
+    ProcessingJobResult:
+      type: object
+      required:
+        - jobId
+        - status
+      properties:
+        jobId:
+          type: string
+          description: Unique job identifier
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+          description: Job status
+        result:
+          $ref: '#/components/schemas/ProcessedResult'
+        error:
+          $ref: '#/components/schemas/ProcessingError'
+        metadata:
+          $ref: '#/components/schemas/JobMetadata'
+
+    ProcessingJobStatus:
+      type: object
+      required:
+        - jobId
+        - status
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        progress:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Progress percentage (0-1)
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        estimatedTimeRemaining:
+          type: integer
+          description: Estimated seconds remaining
+
+    ProcessedResult:
+      type: object
+      required:
+        - elements
+        - metadata
+      properties:
+        elements:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessedElement'
+        metadata:
+          $ref: '#/components/schemas/ProcessingMetadata'
+        chunks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TextChunk'
+          description: Text chunks for RAG indexing
+
+    ProcessedElement:
+      type: object
+      required:
+        - id
+        - type
+        - text
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [text, title, header, footer, table, image, list_item, narrative_text, formula]
+        text:
+          type: string
+        coordinates:
+          $ref: '#/components/schemas/BoundingBox'
+        pageNumber:
+          type: integer
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        metadata:
+          type: object
+          additionalProperties: true
+
+    BoundingBox:
+      type: object
+      required:
+        - x1
+        - y1
+        - x2
+        - y2
+        - page
+      properties:
+        x1:
+          type: number
+          description: Left coordinate
+        y1:
+          type: number
+          description: Top coordinate
+        x2:
+          type: number
+          description: Right coordinate
+        y2:
+          type: number
+          description: Bottom coordinate
+        page:
+          type: integer
+          description: Page number
+
+    TextChunk:
+      type: object
+      required:
+        - id
+        - text
+        - metadata
+      properties:
+        id:
+          type: string
+          description: Chunk identifier
+        text:
+          type: string
+          description: Chunk text content
+        metadata:
+          type: object
+          required:
+            - sourceId
+            - pageNumber
+          properties:
+            sourceId:
+              type: string
+            pageNumber:
+              type: integer
+            chunkIndex:
+              type: integer
+            coordinates:
+              $ref: '#/components/schemas/BoundingBox'
+          additionalProperties: true
+
+    ProcessingMetadata:
+      type: object
+      properties:
+        pagesProcessed:
+          type: integer
+        processingTimeMs:
+          type: integer
+        chunkCount:
+          type: integer
+        tableCount:
+          type: integer
+        imageCount:
+          type: integer
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        warnings:
+          type: array
+          items:
+            type: string
+
+    JobMetadata:
+      type: object
+      properties:
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        fileType:
+          type: string
+        retryCount:
+          type: integer
+        estimatedCost:
+          type: number
+        actualCost:
+          type: number
+
+    ProcessingError:
+      type: object
+      required:
+        - type
+        - message
+        - retryable
+      properties:
+        type:
+          type: string
+          enum: [quota_exceeded, invalid_format, file_too_large, timeout, network_error, authentication_error, server_error, unknown]
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        retryable:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    UsageMetrics:
+      type: object
+      properties:
+        totalDocuments:
+          type: integer
+        totalPages:
+          type: integer
+        fastModePages:
+          type: integer
+        hiResPages:
+          type: integer
+        totalCost:
+          type: number
+        quotaUsed:
+          type: integer
+        quotaLimit:
+          type: integer
+        errorCount:
+          type: integer
+        averageProcessingTime:
+          type: number
+        dailyMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyUsageMetrics'
+
+    DailyUsageMetrics:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        documentsProcessed:
+          type: integer
+        pagesProcessed:
+          type: integer
+        totalCost:
+          type: number
+        errorCount:
+          type: integer

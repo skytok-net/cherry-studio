@@ -304,8 +304,8 @@ const PopupContainer: React.FC<Props> = ({ title, resolve }) => {
               percent={Math.round(progress)}
               status={progress === 100 ? 'success' : 'active'}
               strokeColor={{
-                '0%': '#108ee9',
-                '100%': '#87d068'
+                '0%': '#FF6B35',
+                '100%': '#F59E0B'
               }}
               showInfo={true}
               format={(percent) => `${percent}%`}

@@ -110,6 +110,14 @@ export interface FileMetadata {
    * 该文件的用途
    */
   purpose?: OpenAI.FilePurpose
+  /**
+   * 是否已经通过Unstructured.io处理过
+   */
+  unstructuredProcessed?: boolean
+  /**
+   * Unstructured.io处理作业ID，用于跟踪处理状态
+   */
+  unstructuredJobId?: string
 }
 
 export interface FileType extends FileMetadata {}

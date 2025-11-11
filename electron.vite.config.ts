@@ -3,10 +3,14 @@ import { CodeInspectorPlugin } from 'code-inspector-plugin'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import { resolve } from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
+import { fileURLToPath } from 'url'
 
 // assert not supported by biome
 // import pkg from './package.json' assert { type: 'json' }
 import pkg from './package.json'
+
+// ESM equivalent of __dirname
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 const visualizerPlugin = (type: 'renderer' | 'main') => {
   return process.env[`VISUALIZER_${type.toUpperCase()}`] ? [visualizer({ open: true })] : []
@@ -29,6 +33,10 @@ export default defineConfig({
       }
     },
     build: {
+      lib: {
+        entry: resolve(__dirname, 'src/main/index.ts'),
+        formats: ['cjs']
+      },
       rollupOptions: {
         external: ['bufferutil', 'utf-8-validate', 'electron', ...Object.keys(pkg.dependencies)],
         output: {
@@ -61,6 +69,10 @@ export default defineConfig({
       }
     },
     build: {
+      lib: {
+        entry: resolve(__dirname, 'src/preload/index.ts'),
+        formats: ['cjs']
+      },
       sourcemap: isDev
     }
   },

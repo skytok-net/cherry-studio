@@ -93,7 +93,7 @@ const SpanDetail: FC<SpanDetailProps> = ({ node, clickShowModal }) => {
             clickShowModal(true)
           }}
           href={'#'}
-          style={{ color: '#1677ff' }}
+          style={{ color: 'var(--color-primary-flame, #FF6B35)' }}
           className="back-button">
           <DoubleLeftOutlined style={{ fontSize: '14px' }} />
           <span style={{ marginLeft: '6px', fontSize: '14px' }}>{t('trace.backList')}</span>

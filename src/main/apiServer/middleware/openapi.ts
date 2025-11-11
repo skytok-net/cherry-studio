@@ -10,11 +10,11 @@ const swaggerOptions: swaggerJSDoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Cherry Studio API',
+      title: 'KnowMe Studio API',
       version: '1.0.0',
-      description: 'OpenAI-compatible API for Cherry Studio with additional Cherry-specific endpoints',
+      description: 'OpenAI-compatible API for KnowMe Studio with additional KnowMe-specific endpoints',
       contact: {
-        name: 'Cherry Studio',
+        name: 'KnowMe Studio',
         url: 'https://github.com/CherryHQ/cherry-studio'
       }
     },
@@ -193,7 +193,7 @@ export function setupOpenAPIDocumentation(app: Express) {
         .swagger-ui .topbar { display: none; }
         .swagger-ui .info .title { color: #1890ff; }
       `,
-        customSiteTitle: 'Cherry Studio API Documentation'
+        customSiteTitle: 'KnowMe Studio API Documentation'
       })
     )
 

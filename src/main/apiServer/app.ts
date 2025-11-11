@@ -117,7 +117,7 @@ app.get('/health', (_req, res) => {
  */
 app.get('/', (_req, res) => {
   res.json({
-    name: 'Cherry Studio API',
+    name: 'KnowMe Studio API',
     version: '1.0.0',
     endpoints: {
       health: 'GET /health'

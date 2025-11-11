@@ -2783,6 +2783,15 @@ const migrateConfig = {
       logger.error('migrate 172 error', error as Error)
       return state
     }
+  },
+  '173': (state: RootState) => {
+    try {
+      addPreprocessProviders(state, 'unstructured')
+      return state
+    } catch (error) {
+      logger.error('migrate 173 error', error as Error)
+      return state
+    }
   }
 }
 

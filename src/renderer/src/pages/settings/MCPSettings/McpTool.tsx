@@ -37,7 +37,7 @@ const MCPToolsSection = ({ tools, server, onToggleTool, onToggleAutoApprove }: M
     const getTypeColor = (type: string) => {
       switch (type) {
         case 'string':
-          return 'blue'
+          return 'var(--color-secondary-beige-dark, #D2B48C)'
         case 'number':
           return 'green'
         case 'boolean':

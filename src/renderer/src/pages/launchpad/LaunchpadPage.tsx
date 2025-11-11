@@ -39,13 +39,13 @@ const LaunchpadPage: FC = () => {
       icon: <Sparkle size={32} className="icon" />,
       text: t('title.store'),
       path: '/store',
-      bgColor: 'linear-gradient(135deg, #6366F1, #4F46E5)' // AI助手：靛蓝渐变，代表智能和科技
+      bgColor: 'linear-gradient(135deg, #FF8A5C, #FF6B35)' // AI助手：橙色渐变，代表智能和科技
     },
     {
       icon: <Languages size={32} className="icon" />,
       text: t('title.translate'),
       path: '/translate',
-      bgColor: 'linear-gradient(135deg, #06B6D4, #0EA5E9)' // 翻译：明亮的青蓝色，代表沟通和流畅
+      bgColor: 'linear-gradient(135deg, #10B981, #34D399)' // 翻译：明亮的绿色，代表沟通和流畅
     },
     {
       icon: <Folder size={32} className="icon" />,

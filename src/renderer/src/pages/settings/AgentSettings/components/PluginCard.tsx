@@ -18,7 +18,7 @@ export const PluginCard: FC<PluginCardProps> = ({ plugin, installed, onInstall, 
   const { t } = useTranslation()
 
   const getTypeTagColor = () => {
-    if (plugin.type === 'agent') return 'blue'
+    if (plugin.type === 'agent') return 'var(--color-primary-flame, #FF6B35)'
     if (plugin.type === 'skill') return 'green'
     return 'default'
   }

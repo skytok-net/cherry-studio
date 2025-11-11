@@ -657,8 +657,8 @@ const AddTagButton = styled.button`
 
   &:hover {
     border-color: var(--color-primary);
-    color: #3b82f6;
-    background-color: rgba(59, 130, 246, 0.05);
+    color: var(--color-primary-flame, #FF6B35);
+    background-color: rgba(255, 107, 53, 0.05);
   }
 `
 

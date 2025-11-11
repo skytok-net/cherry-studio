@@ -33,6 +33,20 @@ const initialState: PreprocessState = {
       name: 'Open MinerU',
       apiKey: '',
       apiHost: ''
+    },
+    {
+      id: 'unstructured',
+      name: 'Unstructured.io',
+      apiKey: '',
+      apiHost: 'https://api.unstructured.io',
+      options: {
+        deploymentType: 'hosted',
+        processingMode: 'fast',
+        chunkingStrategy: 'by_title',
+        outputFormat: 'text',
+        maxRetries: 3,
+        timeoutMs: 30000
+      }
     }
   ],
   defaultProvider: 'mineru'

@@ -240,21 +240,34 @@ class KnowledgeService {
     dimensions,
     documentCount
   }: KnowledgeBaseParams): Promise<RAGApplication> => {
+    logger.info(`Getting RAG application for id: ${id}`)
+
     if (this.ragApplications.has(id)) {
+      logger.info(`RAG application already exists for id: ${id}`)
       return this.ragApplications.get(id)!
     }
 
     let ragApplication: RAGApplication
+    logger.info(`Creating embeddings with config:`, {
+      provider: embedApiClient.provider,
+      model: embedApiClient.model,
+      baseURL: embedApiClient.baseURL,
+      dimensions
+    })
+
     const embeddings = new Embeddings({
       embedApiClient,
       dimensions
     })
     try {
       const dbPath = this.getDbPath(id)
+      logger.info(`Using database path: ${dbPath}`)
+
       const libSqlDb = new LibSqlDb({ path: dbPath })
       // Save database instance for later closing
       this.dbInstances.set(id, libSqlDb)
 
+      logger.info(`Building RAG application with documentCount: ${documentCount || 30}`)
       ragApplication = await new RAGApplicationBuilder()
         .setModel('NO_MODEL')
         .setEmbeddingModel(embeddings)
@@ -262,8 +275,16 @@ class KnowledgeService {
         .setSearchResultCount(documentCount || 30)
         .build()
       this.ragApplications.set(id, ragApplication)
+      logger.info(`Successfully created RAG application for id: ${id}`)
     } catch (e) {
       logger.error('Failed to create RAGApplication:', e as Error)
+      logger.error('RAGApplication creation context:', {
+        id,
+        embedApiClient,
+        dimensions,
+        documentCount,
+        dbPath: this.getDbPath(id)
+      })
       throw new Error(`Failed to create RAGApplication: ${e}`)
     }
 

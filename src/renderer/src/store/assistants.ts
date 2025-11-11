@@ -142,6 +142,7 @@ const assistantsSlice = createSlice({
       )
     },
     updateTopics: (state, action: PayloadAction<{ assistantId: string; topics: Topic[] }>) => {
+      // @ts-ignore ts2589
       state.assistants = state.assistants.map((assistant) =>
         assistant.id === action.payload.assistantId
           ? {
@@ -201,11 +202,7 @@ const assistantsSlice = createSlice({
     },
     updateAssistantPreset: (state, action: PayloadAction<AssistantPreset>) => {
       const preset = action.payload
-      state.presets.forEach((a) => {
-        if (a.id === preset.id) {
-          a = preset
-        }
-      })
+      state.presets = state.presets.map((a) => (a.id === preset.id ? preset : a))
     },
     updateAssistantPresetSettings: (
       state,
@@ -216,7 +213,7 @@ const assistantsSlice = createSlice({
         if (agent.id === action.payload.assistantId) {
           for (const key in settings) {
             if (!agent.settings) {
-              agent.settings = DEFAULT_ASSISTANT_SETTINGS
+              agent.settings = { ...DEFAULT_ASSISTANT_SETTINGS }
             }
             agent.settings[key] = settings[key]
           }

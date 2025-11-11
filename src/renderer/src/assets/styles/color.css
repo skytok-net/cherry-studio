@@ -21,9 +21,9 @@
   --color-background-opacity: rgba(34, 34, 34, 0.7);
   --inner-glow-opacity: 0.3; /* For the glassmorphism effect in the dropdown menu */
 
-  --color-primary: #00b96b;
-  --color-primary-soft: #00b96b99;
-  --color-primary-mute: #00b96b33;
+  --color-primary: var(--color-primary-flame, #ff6b35);
+  --color-primary-soft: var(--color-primary-flame-hover, #e55a2b);
+  --color-primary-mute: var(--color-primary-flame-light, #ff8a5c);
 
   --color-text: var(--color-text-1);
   --color-text-secondary: rgba(235, 235, 245, 0.7);
@@ -33,7 +33,7 @@
   --color-border-soft: #ffffff10;
   --color-border-mute: #ffffff05;
   --color-error: #ff4d50;
-  --color-link: #338cff;
+  --color-link: #ff6b35;
   --color-code-background: #323232;
   --color-inline-code-background: #323232;
   --color-inline-code-text: rgb(218, 97, 92);
@@ -68,6 +68,13 @@
   --color-status-success: green;
   --color-status-error: var(--color-error);
   --color-status-warning: #faad14;
+  /* New flame orange and beige color palette */
+  --color-primary-flame: #ff6b35;
+  --color-primary-flame-hover: #e55a2b;
+  --color-primary-flame-light: #ff8a5c;
+  --color-secondary-beige: #f5deb3;
+  --color-secondary-beige-dark: #d2b48c;
+  --color-secondary-beige-light: #faf0e6;
 }
 
 [theme-mode='light'] {
@@ -93,9 +100,9 @@
   --color-background-opacity: rgba(243, 243, 243, 1);
   --inner-glow-opacity: 0.1;
 
-  --color-primary: #00b96b;
-  --color-primary-soft: #00b96b99;
-  --color-primary-mute: #00b96b33;
+  --color-primary: var(--color-primary-flame, #ff6b35);
+  --color-primary-soft: var(--color-primary-flame-hover, #e55a2b);
+  --color-primary-mute: var(--color-primary-flame-light, #ff8a5c);
 
   --color-text: var(--color-text-1);
   --color-text-secondary: rgba(0, 0, 0, 0.75);
@@ -105,7 +112,7 @@
   --color-border-soft: #00000010;
   --color-border-mute: #00000005;
   --color-error: #ff4d50;
-  --color-link: #1677ff;
+  --color-link: #ff6b35;
   --color-code-background: #e3e3e3;
   --color-inline-code-background: rgba(0, 0, 0, 0.06);
   --color-inline-code-text: rgba(235, 87, 87);
@@ -134,6 +141,13 @@
   --chat-background-user: rgba(0, 0, 0, 0.045);
   --chat-background-assistant: transparent;
   --chat-text-user: var(--color-text);
+  /* New flame orange and beige color palette for light mode */
+  --color-primary-flame: #ff6b35;
+  --color-primary-flame-hover: #e55a2b;
+  --color-primary-flame-light: #ff8a5c;
+  --color-secondary-beige: #d2b48c;
+  --color-secondary-beige-dark: #8b7355;
+  --color-secondary-beige-light: #f5deb3;
 }
 
 [navbar-position='left'][theme-mode='light'] {

@@ -153,7 +153,7 @@ const McpServerCard: FC<McpServerCardProps> = ({
         <ServerDescription>{server.description}</ServerDescription>
         <ServerFooter>
           {version && (
-            <VersionBadge color="#108ee9">
+            <VersionBadge color="var(--color-primary-flame, #FF6B35)">
               <VersionText ellipsis={{ tooltip: true }}>{version}</VersionText>
             </VersionBadge>
           )}

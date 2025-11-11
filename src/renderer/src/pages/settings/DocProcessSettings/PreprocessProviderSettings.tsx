@@ -3,7 +3,7 @@ import { ApiKeyListPopup } from '@renderer/components/Popups/ApiKeyListPopup'
 import { getPreprocessProviderLogo, PREPROCESS_PROVIDER_CONFIG } from '@renderer/config/preprocessProviders'
 import { usePreprocessProvider } from '@renderer/hooks/usePreprocess'
 import type { PreprocessProvider } from '@renderer/types'
-import { formatApiKeys, hasObjectKey } from '@renderer/utils'
+import { formatApiKeys } from '@renderer/utils'
 import { Avatar, Button, Divider, Flex, Input, Tooltip } from 'antd'
 import Link from 'antd/es/typography/Link'
 import { List } from 'lucide-react'
@@ -81,58 +81,48 @@ const PreprocessProviderSettings: FC<Props> = ({ provider: _provider }) => {
         </Flex>
       </SettingTitle>
       <Divider style={{ width: '100%', margin: '10px 0' }} />
-      {hasObjectKey(preprocessProvider, 'apiKey') && (
-        <>
-          <SettingSubtitle
-            style={{
-              marginTop: 5,
-              marginBottom: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-            {t('settings.provider.api_key.label')}
-            <Tooltip title={t('settings.provider.api.key.list.open')} mouseEnterDelay={0.5}>
-              <Button type="text" size="small" onClick={openApiKeyList} icon={<List size={14} />} />
-            </Tooltip>
-          </SettingSubtitle>
-          <Flex gap={8}>
-            <Input.Password
-              value={apiKey}
-              placeholder={
-                preprocessProvider.id === 'mineru' ? t('settings.mineru.api_key') : t('settings.provider.api_key.label')
-              }
-              onChange={(e) => setApiKey(formatApiKeys(e.target.value))}
-              onBlur={onUpdateApiKey}
-              spellCheck={false}
-              type="password"
-              autoFocus={apiKey === ''}
-            />
-          </Flex>
-          <SettingHelpTextRow style={{ justifyContent: 'space-between', marginTop: 5 }}>
-            <SettingHelpLink target="_blank" href={apiKeyWebsite}>
-              {t('settings.provider.get_api_key')}
-            </SettingHelpLink>
-            <SettingHelpText>{t('settings.provider.api_key.tip')}</SettingHelpText>
-          </SettingHelpTextRow>
-        </>
-      )}
+      <SettingSubtitle
+        style={{
+          marginTop: 5,
+          marginBottom: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+        {t('settings.provider.api_key.label')}
+        <Tooltip title={t('settings.provider.api.key.list.open')} mouseEnterDelay={0.5}>
+          <Button type="text" size="small" onClick={openApiKeyList} icon={<List size={14} />} />
+        </Tooltip>
+      </SettingSubtitle>
+      <Flex gap={8}>
+        <Input.Password
+          value={apiKey}
+          placeholder={
+            preprocessProvider.id === 'mineru' ? t('settings.mineru.api_key') : t('settings.provider.api_key.label')
+          }
+          onChange={(e) => setApiKey(formatApiKeys(e.target.value))}
+          onBlur={onUpdateApiKey}
+          spellCheck={false}
+          type="password"
+          autoFocus={apiKey === ''}
+        />
+      </Flex>
+      <SettingHelpTextRow style={{ justifyContent: 'space-between', marginTop: 5 }}>
+        <SettingHelpLink target="_blank" href={apiKeyWebsite}>
+          {t('settings.provider.get_api_key')}
+        </SettingHelpLink>
+        <SettingHelpText>{t('settings.provider.api_key.tip')}</SettingHelpText>
+      </SettingHelpTextRow>
 
-      {hasObjectKey(preprocessProvider, 'apiHost') && (
-        <>
-          <SettingSubtitle style={{ marginTop: 5, marginBottom: 10 }}>
-            {t('settings.provider.api_host')}
-          </SettingSubtitle>
-          <Flex>
-            <Input
-              value={apiHost}
-              placeholder={t('settings.provider.api_host')}
-              onChange={(e) => setApiHost(e.target.value)}
-              onBlur={onUpdateApiHost}
-            />
-          </Flex>
-        </>
-      )}
+      <SettingSubtitle style={{ marginTop: 5, marginBottom: 10 }}>{t('settings.provider.api_host')}</SettingSubtitle>
+      <Flex>
+        <Input
+          value={apiHost}
+          placeholder={t('settings.provider.api_host')}
+          onChange={(e) => setApiHost(e.target.value)}
+          onBlur={onUpdateApiHost}
+        />
+      </Flex>
 
       {/* 这部分看起来暂时用不上了 */}
       {/* {hasObjectKey(preprocessProvider, 'options') && preprocessProvider.id === 'system' && (

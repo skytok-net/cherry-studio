@@ -1122,9 +1122,9 @@ const RadioTextItem = styled.div`
 
   /* 选中状态 - 需要添加selected类名 */
   &.selected {
-    background-color: var(--color-primary, #1890ff);
+    background-color: var(--color-primary-flame, #FF6B35);
     color: white;
-    border: 1px solid var(--color-primary, #1890ff);
+    border: 1px solid var(--color-primary-flame, #FF6B35);
   }
 `
 

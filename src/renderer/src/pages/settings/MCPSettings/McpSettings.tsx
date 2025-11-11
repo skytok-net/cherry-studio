@@ -748,7 +748,7 @@ const McpSettings: React.FC = () => {
             <Flex justify="space-between" align="center" gap={5} style={{ marginRight: 10 }}>
               <Flex align="center" gap={8}>
                 <ServerName className="text-nowrap">{server?.name}</ServerName>
-                {serverVersion && <VersionBadge count={serverVersion} color="blue" />}
+                {serverVersion && <VersionBadge count={serverVersion} color="var(--color-primary-flame, #FF6B35)" />}
               </Flex>
               <Button
                 danger

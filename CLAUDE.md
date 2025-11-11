@@ -47,3 +47,10 @@ const logger = loggerService.withContext('moduleName')
 // Renderer: loggerService.initWindowSource('windowName') first
 logger.info('message', CONTEXT)
 ```
+
+## Active Technologies
+- TypeScript/Node.js (Electron app - main process backend, React renderer frontend) + Electron, React, Redux Toolkit, @cherrystudio/embedjs, existing preprocessing providers (001-unstructured-rag-integration)
+- LibSqlDb (vector database), file system cache for processed documents (001-unstructured-rag-integration)
+
+## Recent Changes
+- 001-unstructured-rag-integration: Added TypeScript/Node.js (Electron app - main process backend, React renderer frontend) + Electron, React, Redux Toolkit, @cherrystudio/embedjs, existing preprocessing providers

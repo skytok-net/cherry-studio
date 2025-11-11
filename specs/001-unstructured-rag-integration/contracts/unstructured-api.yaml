@@ -1,0 +1,285 @@
+openapi: 3.0.3
+info:
+  title: Unstructured.io Integration API
+  description: Internal API contracts for Unstructured.io preprocessing provider integration
+  version: 1.0.0
+  
+servers:
+  - url: https://api.unstructured.io
+    description: Hosted Unstructured.io API
+  - url: http://localhost:8000
+    description: Self-hosted Unstructured.io deployment
+
+paths:
+  /general/v0/general:
+    post:
+      summary: Process document with Unstructured.io
+      description: Submit document for processing with specified parameters
+      operationId: processDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - files
+              properties:
+                files:
+                  type: string
+                  format: binary
+                  description: Document file to process
+                strategy:
+                  type: string
+                  enum: [auto, hi_res, fast, ocr_only]
+                  default: auto
+                  description: Processing strategy
+                chunking_strategy:
+                  type: string
+                  enum: [by_title, by_page, by_similarity, basic]
+                  default: basic
+                  description: Text chunking approach
+                output_format:
+                  type: string
+                  enum: [application/json, text/csv]
+                  default: application/json
+                  description: Response format
+                include_page_breaks:
+                  type: boolean
+                  default: false
+                  description: Include page break markers
+                extract_images:
+                  type: boolean
+                  default: false
+                  description: Extract and describe images
+                extract_tables:
+                  type: boolean
+                  default: true
+                  description: Extract table structure
+                coordinates:
+                  type: boolean
+                  default: false
+                  description: Include spatial coordinates
+                pdf_infer_table_structure:
+                  type: boolean
+                  default: true
+                  description: Infer table structure in PDFs
+                languages:
+                  type: array
+                  items:
+                    type: string
+                  description: Expected document languages (ISO 639-1 codes)
+      responses:
+        '200':
+          description: Document processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingResult'
+        '400':
+          description: Bad request - invalid parameters or file format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /general/v0/health:
+    get:
+      summary: Health check endpoint
+      description: Check service availability and status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded]
+                  version:
+                    type: string
+                  uptime:
+                    type: number
+
+components:
+  schemas:
+    ProcessingResult:
+      type: object
+      required:
+        - elements
+      properties:
+        elements:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessedElement'
+          description: Extracted document elements
+        metadata:
+          $ref: '#/components/schemas/DocumentMetadata'
+          description: Document-level metadata
+
+    ProcessedElement:
+      type: object
+      required:
+        - element_id
+        - type
+        - text
+      properties:
+        element_id:
+          type: string
+          description: Unique element identifier
+        type:
+          type: string
+          enum: [Title, NarrativeText, ListItem, Table, Image, Header, Footer, Formula]
+          description: Element type classification
+        text:
+          type: string
+          description: Extracted text content
+        coordinates:
+          $ref: '#/components/schemas/BoundingBox'
+          description: Spatial location in document
+        metadata:
+          $ref: '#/components/schemas/ElementMetadata'
+          description: Element-specific metadata
+        page_number:
+          type: integer
+          minimum: 1
+          description: Source page number
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Extraction confidence score
+
+    BoundingBox:
+      type: object
+      required:
+        - points
+      properties:
+        points:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+          minItems: 4
+          maxItems: 4
+          description: Four corner points [x,y] of bounding box
+        system:
+          type: string
+          description: Coordinate system used
+
+    ElementMetadata:
+      type: object
+      properties:
+        filename:
+          type: string
+          description: Source filename
+        file_directory:
+          type: string
+          description: Source directory
+        filetype:
+          type: string
+          description: File type/extension
+        page_number:
+          type: integer
+          description: Page number
+        category:
+          type: string
+          description: Element category
+        parent_id:
+          type: string
+          description: Parent element ID for hierarchical elements
+        languages:
+          type: array
+          items:
+            type: string
+          description: Detected languages
+        table_as_cells:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+          description: Table data as 2D array (for table elements)
+
+    DocumentMetadata:
+      type: object
+      properties:
+        filename:
+          type: string
+          description: Original filename
+        file_directory:
+          type: string
+          description: File directory
+        filetype:
+          type: string
+          description: File type
+        page_count:
+          type: integer
+          description: Total pages processed
+        languages:
+          type: array
+          items:
+            type: string
+          description: Detected document languages
+        processing_time:
+          type: number
+          description: Processing time in seconds
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type identifier
+        message:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Specific error code
+        details:
+          type: object
+          description: Additional error context
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: unstructured-api-key
+      description: API key for hosted Unstructured.io service
+
+security:
+  - ApiKeyAuth: []

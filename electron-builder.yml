@@ -1,5 +1,5 @@
-appId: com.kangfenmao.CherryStudio
-productName: Cherry Studio
+appId: net.skytok.know-me-studio
+productName: KnowMe Studio
 electronLanguages:
   - zh-CN
   - zh-TW
@@ -14,9 +14,9 @@ directories:
   buildResources: build
 
 protocols:
-  - name: Cherry Studio
+  - name: KnowMe Studio
     schemes:
-      - cherrystudio
+      - knowmestudio
 files:
   - "**/*"
   - "!**/{.vscode,.yarn,.yarn-lock,.github,.cursorrules,.prettierrc}"
@@ -73,7 +73,7 @@ extraResources:
     to: "claude-code-plugins"
 
 win:
-  executableName: Cherry Studio
+  executableName: KnowMe Studio
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
   target:
     - target: nsis

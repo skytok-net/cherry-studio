@@ -9,5 +9,12 @@ type Props = {
 
 export const RerankerTag = ({ size, ...restProps }: Props) => {
   const { t } = useTranslation()
-  return <CustomTag size={size} color="#6495ED" icon={t('models.type.rerank')} {...restProps} />
+  return (
+    <CustomTag
+      size={size}
+      color="var(--color-secondary-beige-dark, #D2B48C)"
+      icon={t('models.type.rerank')}
+      {...restProps}
+    />
+  )
 }

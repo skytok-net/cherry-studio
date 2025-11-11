@@ -16,7 +16,7 @@ export const WebSearchTag = ({ size, showTooltip, showLabel, ...restProps }: Pro
   return (
     <CustomTag
       size={size}
-      color="#1677ff"
+      color="var(--color-primary-flame, #FF6B35)"
       icon={<GlobalOutlined style={{ fontSize: size }} />}
       tooltip={showTooltip ? t('models.type.websearch') : undefined}
       {...restProps}>
