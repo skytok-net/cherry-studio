@@ -24,7 +24,7 @@ export default class UnstructuredPreprocessProvider extends BasePreprocessProvid
       name: provider.name || 'Unstructured.io',
       type: 'preprocess',
       deploymentType: (provider.options?.deploymentType as 'hosted' | 'self-hosted') || 'hosted',
-      apiEndpoint: provider.apiHost || 'https://api.unstructured.io',
+      apiEndpoint: provider.apiHost || 'https://api.unstructuredapp.io',
       apiKey: provider.apiKey,
       processingMode: (provider.options?.processingMode as 'fast' | 'hi_res') || 'fast',
       chunkingStrategy: (provider.options?.chunkingStrategy as any) || 'by_title',

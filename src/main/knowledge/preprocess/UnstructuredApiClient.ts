@@ -103,6 +103,7 @@ export class UnstructuredApiClient {
         }
 
         // Let the browser/Node.js automatically set Content-Type with proper boundary
+        // Correct endpoint for Unstructured.io hosted API
         const response = await this.httpClient.post('/general/v0/general', formData)
 
         const processingTime = Date.now() - startTime
@@ -346,7 +347,7 @@ export class UnstructuredApiClient {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const response = await this.httpClient.get('/general/docs')
+      const response = await this.httpClient.get('/general/v0/general/docs')
       return response.status === 200
     } catch (error) {
       logger.error('Connection test failed', { error })
