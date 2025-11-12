@@ -1362,35 +1362,6 @@
     "preview": "Preview",
     "split": "Split"
   },
-  "tsx_artifacts": {
-    "capture": {
-      "label": "Capture Preview",
-      "to_clipboard": "Copy to Clipboard",
-      "to_file": "Save as Image"
-    },
-    "code": "Code",
-    "empty_preview": "No content to preview",
-    "error": {
-      "title": "Preview Error"
-    },
-    "fix": {
-      "button": "Fix Code",
-      "error": {
-        "no_context": "Unable to get message context",
-        "send_failed": "Failed to send fix request"
-      },
-      "requested": "Fix request sent to AI",
-      "requesting": "Requesting fix..."
-    },
-    "generating": "Generating component...",
-    "preview": "Preview",
-    "retry": {
-      "attempt": "Auto-retry attempt {{attempt}}/{{max}}",
-      "max_reached": "Maximum retry attempts reached. Please fix manually or request a fix."
-    },
-    "split": "Split",
-    "transpiling": "Transpiling and rendering..."
-  },
   "knowledge": {
     "add": {
       "title": "Add Knowledge Base"
@@ -1518,21 +1489,37 @@
       "chunking_by_title": "By Title",
       "chunking_strategy": "Chunking Strategy",
       "chunking_strategy_tooltip": "How to split document into chunks: By Title (semantic sections), By Page (page boundaries), By Similarity (content similarity), Basic (fixed size)",
+      "combine_under_n_chars": "Combine Text Under N Characters",
+      "combine_under_n_chars_tooltip": "Combine small text elements that are under this character threshold into a single chunk. Leave empty for auto mode",
       "coordinates": "Extract Coordinates",
       "coordinates_tooltip": "Include bounding box coordinates for each text element (useful for document layout analysis)",
+      "deployment_hosted": "Hosted (Unstructured.io API)",
+      "deployment_self_hosted": "Self-Hosted",
+      "deployment_type": "Deployment Type",
+      "deployment_type_tooltip": "Choose between hosted Unstructured.io API or your own self-hosted instance",
       "include_page_breaks": "Include Page Breaks",
       "include_page_breaks_tooltip": "Mark page boundaries in the extracted text",
+      "languages": "Languages",
+      "languages_tooltip": "Comma-separated language codes for OCR (e.g., eng, spa, fra). Leave empty to auto-detect",
       "max_characters": "Maximum Characters per Chunk",
       "max_characters_tooltip": "Hard limit for chunk size. Larger values capture more context but consume more tokens. Recommended: 500-2000",
+      "max_retries": "Maximum Retries",
+      "max_retries_tooltip": "Number of retry attempts for failed API requests",
       "mode_auto": "Auto (Recommended)",
       "mode_fast": "Fast",
       "mode_hi_res": "High Resolution",
+      "new_after_n_chars": "New Chunk After N Characters",
+      "new_after_n_chars_tooltip": "Start a new chunk after reaching this character threshold. Leave empty for auto mode based on chunking strategy",
       "overlap": "Chunk Overlap",
+      "overlap_all": "Apply Overlap to All Chunks",
+      "overlap_all_tooltip": "When enabled, applies overlap to all chunks. When disabled, only applies to chunks created by splitting text",
       "overlap_tooltip": "Number of characters to overlap between chunks. Helps maintain context across chunk boundaries. Recommended: 50-200",
       "pdf_infer_table_structure": "Extract PDF Tables",
       "pdf_infer_table_structure_tooltip": "Attempt to detect and extract table structures from PDFs (requires Hi-Res mode for best results)",
       "processing_mode": "Processing Mode",
-      "processing_mode_tooltip": "Strategy for document processing: Auto (smart detection), Fast (quick but basic), Hi-Res (high quality but slower)"
+      "processing_mode_tooltip": "Strategy for document processing: Auto (smart detection), Fast (quick but basic), Hi-Res (high quality but slower)",
+      "timeout_ms": "Request Timeout (ms)",
+      "timeout_ms_tooltip": "Maximum time to wait for API requests in milliseconds. Increase for large documents"
     },
     "url_added": "URL added",
     "url_placeholder": "Enter URL, multiple URLs separated by Enter",
@@ -4927,6 +4914,38 @@
     "quit": "Quit",
     "show_mini_window": "Quick Assistant",
     "show_window": "Show Window"
+  },
+  "tsx_artifacts": {
+    "capture": {
+      "label": "Capture Preview",
+      "to_clipboard": "Copy to Clipboard",
+      "to_file": "Save as Image"
+    },
+    "code": "Code",
+    "empty_preview": "No content to preview",
+    "error": {
+      "title": "Preview Error"
+    },
+    "fix": {
+      "button": "Fix Code",
+      "error": {
+        "no_context": "Unable to get message context",
+        "send_failed": "Failed to send fix request"
+      },
+      "requested": "Fix request sent to AI",
+      "requesting": "Requesting fix..."
+    },
+    "generating": "Generating component...",
+    "preview": "Preview",
+    "retry": {
+      "attempt": "Auto-retry attempt {{attempt}}/{{max}}",
+      "max_reached": "Maximum retry attempts reached. Please fix manually or request a fix.",
+      "scheduling": "Retry scheduled in {{seconds}}s...",
+      "sending": "Sending fix request to AI...",
+      "waiting": "Waiting for AI response..."
+    },
+    "split": "Split",
+    "transpiling": "Transpiling and rendering..."
   },
   "update": {
     "install": "Install",

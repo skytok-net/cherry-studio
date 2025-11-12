@@ -8,9 +8,9 @@
 import * as http from 'http'
 import * as https from 'https'
 
-import type { NetworkErrorCode,NetworkRequest } from '../../types/networkTypes'
+import type { NetworkErrorCode, NetworkRequest } from '../../types/networkTypes'
 import { NetworkErrorCodes } from '../../types/networkTypes'
-import { NetworkSecurityError, RequestSanitizer,UrlValidator } from '../../utils/networkSecurity'
+import { NetworkSecurityError, RequestSanitizer, UrlValidator } from '../../utils/networkSecurity'
 
 // ============================================================================
 // Interfaces

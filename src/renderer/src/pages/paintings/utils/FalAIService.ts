@@ -1,6 +1,6 @@
 import { loggerService } from '@logger'
 import { CacheService } from '@renderer/services/CacheService'
-import type { FalAIPainting,FileMetadata } from '@renderer/types'
+import type { FalAIPainting, FileMetadata } from '@renderer/types'
 
 import type { FalAIModel } from '../config/falAIConfig'
 

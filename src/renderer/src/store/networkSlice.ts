@@ -5,8 +5,8 @@
  * in the renderer process. Manages the state of network-enabled artifacts.
  */
 
-import type { PayloadAction } from '@reduxjs/toolkit';
-import { createAsyncThunk,createSlice } from '@reduxjs/toolkit'
+import type { PayloadAction } from '@reduxjs/toolkit'
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 
 import type {
   DomainReputation,
@@ -15,7 +15,8 @@ import type {
   NetworkSettings,
   NetworkStats,
   RequestStatus,
-  SecurityViolation} from '../../../main/types/networkTypes'
+  SecurityViolation
+} from '../../../main/types/networkTypes'
 
 // ============================================================================
 // State Interface

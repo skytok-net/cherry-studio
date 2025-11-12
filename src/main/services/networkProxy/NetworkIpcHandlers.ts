@@ -5,7 +5,7 @@
  * Handles communication between renderer process and network proxy service.
  */
 
-import { BrowserWindow,ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 
 import type {
   DomainReputation,

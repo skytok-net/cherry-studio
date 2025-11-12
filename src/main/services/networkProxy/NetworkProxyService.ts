@@ -14,7 +14,8 @@ import type {
   NetworkSettings,
   NetworkStats,
   RequestStatus,
-  SecurityViolation} from '../../types/networkTypes'
+  SecurityViolation
+} from '../../types/networkTypes'
 import type { DomainReputationService } from '../domainReputation/DomainReputationService'
 import type { RequestCache } from '../requestCache/RequestCache'
 import type { SecurityPolicy, SecurityValidationResult } from '../securityPolicy/SecurityPolicy'

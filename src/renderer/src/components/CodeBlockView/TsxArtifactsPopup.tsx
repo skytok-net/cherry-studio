@@ -88,6 +88,8 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
   const [isTranspiling, setIsTranspiling] = useState(false)
   const [retryAttempt, setRetryAttempt] = useState(0)
   const [isFixing, setIsFixing] = useState(false)
+  const [retryStatus, setRetryStatus] = useState<'idle' | 'scheduling' | 'sending' | 'waiting'>('idle')
+  const [retryCountdown, setRetryCountdown] = useState<number>(0)
   const codeEditorRef = useRef<CodeEditorHandles>(null)
   const previewFrameRef = useRef<HTMLIFrameElement>(null)
   const esbuildLoadedRef = useRef(false)
@@ -95,6 +97,7 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
   const transpilerTypeRef = useRef<'esbuild' | 'babel' | null>(null)
   const lastErrorRef = useRef<string | null>(null)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const handleAutoRetryRef = useRef<(() => void) | null>(null)
 
   // Load transpilers from bundled npm packages (more reliable than CDN)
@@ -720,6 +723,9 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current)
       }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+      }
     }
   }, [open, retryAttempt, blockId])
 
@@ -758,7 +764,19 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
     if (tsx.trim()) {
       setRetryAttempt(0)
       setPreviewError(null)
+      setRetryStatus('idle')
+      setRetryCountdown(0)
       lastErrorRef.current = null
+
+      // Clear any pending retry timers
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+        countdownIntervalRef.current = null
+      }
     }
   }, [tsx])
 
@@ -839,25 +857,56 @@ Please provide the corrected code in a \`\`\`tsx code block.`
   const handleAutoRetry = useCallback(() => {
     if (retryAttempt >= MAX_AUTO_RETRY_ATTEMPTS) {
       logger.info(`Max retry attempts (${MAX_AUTO_RETRY_ATTEMPTS + 1}) reached for TSX artifact`)
+      setRetryStatus('idle')
       return
     }
 
     logger.info(`Auto-retry attempt ${retryAttempt + 1}/${MAX_AUTO_RETRY_ATTEMPTS + 1} for TSX artifact`)
 
-    // Delay before retry to avoid rapid requests
-    retryTimeoutRef.current = setTimeout(
-      async () => {
-        const newAttempt = retryAttempt + 1
-        setRetryAttempt(newAttempt)
+    // Calculate delay with exponential backoff: 2s, 4s, 6s, 8s
+    const delaySeconds = 2 * (retryAttempt + 1)
 
-        // Send fix request
-        if (blockId && lastErrorRef.current) {
-          setIsFixing(true)
-          try {
-            const context = getMessageContext()
-            if (context) {
-              const { assistant, topic } = context
-              const fixPrompt = `The following React/TSX code has a compilation or rendering error. Please fix it:
+    // Set status to scheduling and start countdown
+    setRetryStatus('scheduling')
+    setRetryCountdown(delaySeconds)
+
+    // Clear any existing countdown interval
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
+    }
+
+    // Start countdown interval
+    countdownIntervalRef.current = setInterval(() => {
+      setRetryCountdown((prev) => {
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    // Delay before retry to avoid rapid requests
+    retryTimeoutRef.current = setTimeout(async () => {
+      // Clear countdown interval
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+      }
+
+      const newAttempt = retryAttempt + 1
+      setRetryAttempt(newAttempt)
+
+      // Send fix request
+      if (blockId && lastErrorRef.current) {
+        setRetryStatus('sending')
+        setIsFixing(true)
+        try {
+          const context = getMessageContext()
+          if (context) {
+            const { assistant, topic } = context
+            const fixPrompt = `The following React/TSX code has a compilation or rendering error. Please fix it:
 
 \`\`\`tsx
 ${tsx}
@@ -867,24 +916,24 @@ Error: ${lastErrorRef.current}
 
 Please provide the corrected code in a \`\`\`tsx code block.`
 
-              const { message: userMessage, blocks } = getUserMessage({
-                content: fixPrompt,
-                assistant,
-                topic
-              })
+            const { message: userMessage, blocks } = getUserMessage({
+              content: fixPrompt,
+              assistant,
+              topic
+            })
 
-              await dispatch(sendMessage(userMessage, blocks, assistant, topic.id))
-              logger.info(`Auto-fix request sent (attempt ${newAttempt})`)
-            }
-          } catch (error) {
-            logger.error('Failed to send auto-fix request:', error as Error)
-          } finally {
-            setIsFixing(false)
+            setRetryStatus('waiting')
+            await dispatch(sendMessage(userMessage, blocks, assistant, topic.id))
+            logger.info(`Auto-fix request sent (attempt ${newAttempt})`)
           }
+        } catch (error) {
+          logger.error('Failed to send auto-fix request:', error as Error)
+          setRetryStatus('idle')
+        } finally {
+          setIsFixing(false)
         }
-      },
-      2000 * (retryAttempt + 1)
-    ) // Exponential backoff: 2s, 4s, 6s, 8s
+      }
+    }, delaySeconds * 1000)
   }, [retryAttempt, blockId, tsx, dispatch, getMessageContext])
 
   // Ensure latest handler is available synchronously
@@ -1067,6 +1116,23 @@ Please provide the corrected code in a \`\`\`tsx code block.`
                           max: MAX_AUTO_RETRY_ATTEMPTS + 1
                         })}
                       </RetryInfo>
+                    )}
+                    {retryStatus === 'scheduling' && retryCountdown > 0 && (
+                      <RetryStatusMessage $status="scheduling">
+                        {t('tsx_artifacts.retry.scheduling', 'Retry scheduled in {{seconds}}s...', {
+                          seconds: retryCountdown
+                        })}
+                      </RetryStatusMessage>
+                    )}
+                    {retryStatus === 'sending' && (
+                      <RetryStatusMessage $status="sending">
+                        {t('tsx_artifacts.retry.sending', 'Sending fix request to AI...')}
+                      </RetryStatusMessage>
+                    )}
+                    {retryStatus === 'waiting' && (
+                      <RetryStatusMessage $status="waiting">
+                        {t('tsx_artifacts.retry.waiting', 'Waiting for AI response...')}
+                      </RetryStatusMessage>
                     )}
                   </div>
                   <FixButtonContainer>
@@ -1405,6 +1471,40 @@ const RetryInfo = styled.div`
   color: #ff7875;
   margin-top: 4px;
   font-weight: normal;
+`
+
+const RetryStatusMessage = styled.div<{ $status: 'scheduling' | 'sending' | 'waiting' }>`
+  font-size: 12px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: inline-block;
+
+  ${(props) => {
+    switch (props.$status) {
+      case 'scheduling':
+        return `
+          background: #fff7e6;
+          border: 1px solid #ffd591;
+          color: #d46b08;
+        `
+      case 'sending':
+        return `
+          background: #e6f7ff;
+          border: 1px solid #91d5ff;
+          color: #0958d9;
+        `
+      case 'waiting':
+        return `
+          background: #f0f5ff;
+          border: 1px solid #adc6ff;
+          color: #1d39c4;
+        `
+      default:
+        return ''
+    }
+  }}
 `
 
 const FixButtonContainer = styled.div`

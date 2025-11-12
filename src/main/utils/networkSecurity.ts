@@ -11,7 +11,8 @@ import type {
   NetworkRequest,
   ReputationLevel,
   SecurityViolation,
-  SecurityViolationType} from '../types/networkTypes'
+  SecurityViolationType
+} from '../types/networkTypes'
 
 // ============================================================================
 // Enhanced Error Classes

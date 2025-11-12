@@ -1046,6 +1046,9 @@
       "svg": "下載 SVG"
     },
     "edit": {
+      "copy": {
+        "label": "[to be translated]:Copy Code"
+      },
       "label": "編輯",
       "save": {
         "failed": {
@@ -1480,27 +1483,43 @@
     "topN_too_large_or_small": "返回結果數量不能大於 30 或小於 1",
     "topN_tooltip": "返回的匹配結果數量，數值越大，匹配結果越多，但消耗的 Token 也越多",
     "unstructured": {
-      "chunking_basic": "[to be translated]:Basic",
-      "chunking_by_page": "[to be translated]:By Page",
-      "chunking_by_similarity": "[to be translated]:By Similarity",
-      "chunking_by_title": "[to be translated]:By Title",
-      "chunking_strategy": "[to be translated]:Chunking Strategy",
-      "chunking_strategy_tooltip": "[to be translated]:How to split document into chunks: By Title (semantic sections), By Page (page boundaries), By Similarity (content similarity), Basic (fixed size)",
-      "coordinates": "[to be translated]:Extract Coordinates",
-      "coordinates_tooltip": "[to be translated]:Include bounding box coordinates for each text element (useful for document layout analysis)",
-      "include_page_breaks": "[to be translated]:Include Page Breaks",
-      "include_page_breaks_tooltip": "[to be translated]:Mark page boundaries in the extracted text",
-      "max_characters": "[to be translated]:Maximum Characters per Chunk",
-      "max_characters_tooltip": "[to be translated]:Hard limit for chunk size. Larger values capture more context but consume more tokens. Recommended: 500-2000",
-      "mode_auto": "[to be translated]:Auto (Recommended)",
-      "mode_fast": "[to be translated]:Fast",
-      "mode_hi_res": "[to be translated]:High Resolution",
-      "overlap": "[to be translated]:Chunk Overlap",
-      "overlap_tooltip": "[to be translated]:Number of characters to overlap between chunks. Helps maintain context across chunk boundaries. Recommended: 50-200",
-      "pdf_infer_table_structure": "[to be translated]:Extract PDF Tables",
-      "pdf_infer_table_structure_tooltip": "[to be translated]:Attempt to detect and extract table structures from PDFs (requires Hi-Res mode for best results)",
-      "processing_mode": "[to be translated]:Processing Mode",
-      "processing_mode_tooltip": "[to be translated]:Strategy for document processing: Auto (smart detection), Fast (quick but basic), Hi-Res (high quality but slower)"
+      "chunking_basic": "基礎",
+      "chunking_by_page": "按頁",
+      "chunking_by_similarity": "按相似度",
+      "chunking_by_title": "按標題",
+      "chunking_strategy": "分塊策略",
+      "chunking_strategy_tooltip": "如何將文件拆分為區塊：按標題（語義部分）、按頁（頁面邊界）、按相似度（內容相似度）、基礎（固定大小）",
+      "combine_under_n_chars": "合併小於N個字元的文字",
+      "combine_under_n_chars_tooltip": "將字元數低於此閾值的小文字元素合併為單一區塊。留空為自動模式",
+      "coordinates": "提取座標",
+      "coordinates_tooltip": "包含每個文字元素的邊界框座標（用於文件版面分析）",
+      "deployment_hosted": "託管（Unstructured.io API）",
+      "deployment_self_hosted": "自託管",
+      "deployment_type": "部署類型",
+      "deployment_type_tooltip": "選擇託管的 Unstructured.io API 或您自己的自託管實例",
+      "include_page_breaks": "包含分頁符",
+      "include_page_breaks_tooltip": "在提取的文字中標記頁面邊界",
+      "languages": "語言",
+      "languages_tooltip": "用於 OCR 的逗號分隔語言代碼（例如 eng、spa、fra）。留空以自動檢測",
+      "max_characters": "每塊最大字元數",
+      "max_characters_tooltip": "區塊大小的硬限制。較大的值可以捕獲更多上下文，但消耗更多令牌。推薦：500-2000",
+      "max_retries": "最大重試次數",
+      "max_retries_tooltip": "失敗的 API 請求的重試次數",
+      "mode_auto": "自動（推薦）",
+      "mode_fast": "快速",
+      "mode_hi_res": "高解析度",
+      "new_after_n_chars": "N個字元後新建塊",
+      "new_after_n_chars_tooltip": "達到此字元閾值後開始新區塊。留空為基於分塊策略的自動模式",
+      "overlap": "區塊重疊",
+      "overlap_all": "套用重疊到所有區塊",
+      "overlap_all_tooltip": "啟用時，將重疊套用於所有區塊。停用時，僅套用於透過拆分文字建立的區塊",
+      "overlap_tooltip": "區塊之間重疊的字元數。有助於在區塊邊界之間保持上下文。推薦：50-200",
+      "pdf_infer_table_structure": "提取 PDF 表格",
+      "pdf_infer_table_structure_tooltip": "嘗試檢測並提取 PDF 中的表格結構（需要高解析度模式以獲得最佳效果）",
+      "processing_mode": "處理模式",
+      "processing_mode_tooltip": "文件處理策略：自動（智慧檢測）、快速（快速但基礎）、高解析度（高品質但較慢）",
+      "timeout_ms": "請求逾時（毫秒）",
+      "timeout_ms_tooltip": "等待 API 請求的最長時間（毫秒）。對於大型文件，請增加此值"
     },
     "url_added": "網址已新增",
     "url_placeholder": "請輸入網址，多個網址用換行符號分隔",
@@ -4895,6 +4914,38 @@
     "quit": "結束",
     "show_mini_window": "快捷助手",
     "show_window": "顯示視窗"
+  },
+  "tsx_artifacts": {
+    "capture": {
+      "label": "[to be translated]:Capture Preview",
+      "to_clipboard": "[to be translated]:Copy to Clipboard",
+      "to_file": "[to be translated]:Save as Image"
+    },
+    "code": "[to be translated]:Code",
+    "empty_preview": "[to be translated]:No content to preview",
+    "error": {
+      "title": "[to be translated]:Preview Error"
+    },
+    "fix": {
+      "button": "[to be translated]:Fix Code",
+      "error": {
+        "no_context": "[to be translated]:Unable to get message context",
+        "send_failed": "[to be translated]:Failed to send fix request"
+      },
+      "requested": "[to be translated]:Fix request sent to AI",
+      "requesting": "[to be translated]:Requesting fix..."
+    },
+    "generating": "[to be translated]:Generating component...",
+    "preview": "[to be translated]:Preview",
+    "retry": {
+      "attempt": "[to be translated]:Auto-retry attempt {{attempt}}/{{max}}",
+      "max_reached": "[to be translated]:Maximum retry attempts reached. Please fix manually or request a fix.",
+      "scheduling": "[to be translated]:Retry scheduled in {{seconds}}s...",
+      "sending": "[to be translated]:Sending fix request to AI...",
+      "waiting": "[to be translated]:Waiting for AI response..."
+    },
+    "split": "[to be translated]:Split",
+    "transpiling": "[to be translated]:Transpiling and rendering..."
   },
   "update": {
     "install": "立即安裝",

@@ -1046,6 +1046,9 @@
       "svg": "Télécharger en SVG"
     },
     "edit": {
+      "copy": {
+        "label": "[to be translated]:Copy Code"
+      },
       "label": "Modifier",
       "save": {
         "failed": {
@@ -1486,21 +1489,37 @@
       "chunking_by_title": "[to be translated]:By Title",
       "chunking_strategy": "[to be translated]:Chunking Strategy",
       "chunking_strategy_tooltip": "[to be translated]:How to split document into chunks: By Title (semantic sections), By Page (page boundaries), By Similarity (content similarity), Basic (fixed size)",
+      "combine_under_n_chars": "[to be translated]:Combine Text Under N Characters",
+      "combine_under_n_chars_tooltip": "[to be translated]:Combine small text elements that are under this character threshold into a single chunk. Leave empty for auto mode",
       "coordinates": "[to be translated]:Extract Coordinates",
       "coordinates_tooltip": "[to be translated]:Include bounding box coordinates for each text element (useful for document layout analysis)",
+      "deployment_hosted": "[to be translated]:Hosted (Unstructured.io API)",
+      "deployment_self_hosted": "[to be translated]:Self-Hosted",
+      "deployment_type": "[to be translated]:Deployment Type",
+      "deployment_type_tooltip": "[to be translated]:Choose between hosted Unstructured.io API or your own self-hosted instance",
       "include_page_breaks": "[to be translated]:Include Page Breaks",
       "include_page_breaks_tooltip": "[to be translated]:Mark page boundaries in the extracted text",
+      "languages": "[to be translated]:Languages",
+      "languages_tooltip": "[to be translated]:Comma-separated language codes for OCR (e.g., eng, spa, fra). Leave empty to auto-detect",
       "max_characters": "[to be translated]:Maximum Characters per Chunk",
       "max_characters_tooltip": "[to be translated]:Hard limit for chunk size. Larger values capture more context but consume more tokens. Recommended: 500-2000",
+      "max_retries": "[to be translated]:Maximum Retries",
+      "max_retries_tooltip": "[to be translated]:Number of retry attempts for failed API requests",
       "mode_auto": "[to be translated]:Auto (Recommended)",
       "mode_fast": "[to be translated]:Fast",
       "mode_hi_res": "[to be translated]:High Resolution",
+      "new_after_n_chars": "[to be translated]:New Chunk After N Characters",
+      "new_after_n_chars_tooltip": "[to be translated]:Start a new chunk after reaching this character threshold. Leave empty for auto mode based on chunking strategy",
       "overlap": "[to be translated]:Chunk Overlap",
+      "overlap_all": "[to be translated]:Apply Overlap to All Chunks",
+      "overlap_all_tooltip": "[to be translated]:When enabled, applies overlap to all chunks. When disabled, only applies to chunks created by splitting text",
       "overlap_tooltip": "[to be translated]:Number of characters to overlap between chunks. Helps maintain context across chunk boundaries. Recommended: 50-200",
       "pdf_infer_table_structure": "[to be translated]:Extract PDF Tables",
       "pdf_infer_table_structure_tooltip": "[to be translated]:Attempt to detect and extract table structures from PDFs (requires Hi-Res mode for best results)",
       "processing_mode": "[to be translated]:Processing Mode",
-      "processing_mode_tooltip": "[to be translated]:Strategy for document processing: Auto (smart detection), Fast (quick but basic), Hi-Res (high quality but slower)"
+      "processing_mode_tooltip": "[to be translated]:Strategy for document processing: Auto (smart detection), Fast (quick but basic), Hi-Res (high quality but slower)",
+      "timeout_ms": "[to be translated]:Request Timeout (ms)",
+      "timeout_ms_tooltip": "[to be translated]:Maximum time to wait for API requests in milliseconds. Increase for large documents"
     },
     "url_added": "URL ajoutée",
     "url_placeholder": "Entrez l'URL, plusieurs URLs séparées par des sauts de ligne",
@@ -4895,6 +4914,38 @@
     "quit": "Quitter",
     "show_mini_window": "Assistant Rapide",
     "show_window": "Afficher la fenêtre"
+  },
+  "tsx_artifacts": {
+    "capture": {
+      "label": "[to be translated]:Capture Preview",
+      "to_clipboard": "[to be translated]:Copy to Clipboard",
+      "to_file": "[to be translated]:Save as Image"
+    },
+    "code": "[to be translated]:Code",
+    "empty_preview": "[to be translated]:No content to preview",
+    "error": {
+      "title": "[to be translated]:Preview Error"
+    },
+    "fix": {
+      "button": "[to be translated]:Fix Code",
+      "error": {
+        "no_context": "[to be translated]:Unable to get message context",
+        "send_failed": "[to be translated]:Failed to send fix request"
+      },
+      "requested": "[to be translated]:Fix request sent to AI",
+      "requesting": "[to be translated]:Requesting fix..."
+    },
+    "generating": "[to be translated]:Generating component...",
+    "preview": "[to be translated]:Preview",
+    "retry": {
+      "attempt": "[to be translated]:Auto-retry attempt {{attempt}}/{{max}}",
+      "max_reached": "[to be translated]:Maximum retry attempts reached. Please fix manually or request a fix.",
+      "scheduling": "[to be translated]:Retry scheduled in {{seconds}}s...",
+      "sending": "[to be translated]:Sending fix request to AI...",
+      "waiting": "[to be translated]:Waiting for AI response..."
+    },
+    "split": "[to be translated]:Split",
+    "transpiling": "[to be translated]:Transpiling and rendering..."
   },
   "update": {
     "install": "Installer",

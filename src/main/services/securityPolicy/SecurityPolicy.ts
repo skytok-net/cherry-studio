@@ -5,7 +5,7 @@
  * private network access controls, and security violation handling.
  */
 
-import type { NetworkRequest, NetworkSettings,SecurityViolation } from '../../types/networkTypes'
+import type { NetworkRequest, NetworkSettings, SecurityViolation } from '../../types/networkTypes'
 
 // ============================================================================
 // Security Policy Configuration
