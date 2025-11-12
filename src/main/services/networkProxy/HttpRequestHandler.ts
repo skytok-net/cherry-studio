@@ -7,13 +7,10 @@
 
 import * as http from 'http'
 import * as https from 'https'
-import type { NetworkRequest, NetworkErrorCode } from '../../types/networkTypes'
+
+import type { NetworkErrorCode,NetworkRequest } from '../../types/networkTypes'
 import { NetworkErrorCodes } from '../../types/networkTypes'
-import {
-  NetworkSecurityError,
-  UrlValidator,
-  RequestSanitizer
-} from '../../utils/networkSecurity'
+import { NetworkSecurityError, RequestSanitizer,UrlValidator } from '../../utils/networkSecurity'
 
 // ============================================================================
 // Interfaces
@@ -55,11 +52,11 @@ export class HttpRequestHandler {
 
   constructor(options: Partial<HttpRequestOptions> = {}) {
     this.defaultOptions = {
-      timeout: 10000,           // 10 seconds
+      timeout: 10000, // 10 seconds
       maxRedirects: 5,
       validateStatus: true,
       followRedirects: true,
-      maxResponseSize: 10 * 1024 * 1024,  // 10MB
+      maxResponseSize: 10 * 1024 * 1024, // 10MB
       enforceHttps: false,
       ...options
     }
@@ -69,10 +66,7 @@ export class HttpRequestHandler {
   /**
    * Execute HTTP request with comprehensive error handling
    */
-  async executeRequest(
-    request: NetworkRequest,
-    options: Partial<HttpRequestOptions> = {}
-  ): Promise<HttpResponse> {
+  async executeRequest(request: NetworkRequest, options: Partial<HttpRequestOptions> = {}): Promise<HttpResponse> {
     const mergedOptions = { ...this.defaultOptions, ...options }
 
     // Create request context for tracking
@@ -94,11 +88,9 @@ export class HttpRequestHandler {
       const response = await this.performHttpRequest(request, context, mergedOptions)
 
       return response
-
     } catch (error) {
       this.handleRequestError(request, error, context)
       throw error
-
     } finally {
       this.activeRequests.delete(request.id)
     }
@@ -260,11 +252,7 @@ export class HttpRequestHandler {
     // Handle redirects
     if (this.isRedirect(response.statusCode) && options.followRedirects) {
       if (context.redirectCount >= options.maxRedirects) {
-        reject(this.createNetworkError(
-          request,
-          new Error(`Too many redirects (${context.redirectCount})`),
-          'network'
-        ))
+        reject(this.createNetworkError(request, new Error(`Too many redirects (${context.redirectCount})`), 'network'))
         return
       }
 
@@ -275,9 +263,7 @@ export class HttpRequestHandler {
 
         // Create new request for redirect
         const redirectRequest = { ...request, url: context.finalUrl }
-        this.performHttpRequest(redirectRequest, context, options)
-          .then(resolve)
-          .catch(reject)
+        this.performHttpRequest(redirectRequest, context, options).then(resolve).catch(reject)
         return
       }
     }
@@ -292,11 +278,7 @@ export class HttpRequestHandler {
       totalSize += chunk.length
       if (totalSize > options.maxResponseSize) {
         context.controller?.abort()
-        reject(this.createNetworkError(
-          request,
-          new Error(`Response too large (${totalSize} bytes)`),
-          'network'
-        ))
+        reject(this.createNetworkError(request, new Error(`Response too large (${totalSize} bytes)`), 'network'))
         return
       }
 
@@ -312,12 +294,14 @@ export class HttpRequestHandler {
 
         // Validate status code if required
         if (options.validateStatus && !this.isSuccessStatus(response.statusCode)) {
-          reject(this.createNetworkError(
-            request,
-            new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`),
-            'network',
-            { status: response.statusCode, statusText: response.statusMessage }
-          ))
+          reject(
+            this.createNetworkError(
+              request,
+              new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`),
+              'network',
+              { status: response.statusCode, statusText: response.statusMessage }
+            )
+          )
           return
         }
 
@@ -331,7 +315,6 @@ export class HttpRequestHandler {
         }
 
         resolve(httpResponse)
-
       } catch (error) {
         reject(this.createNetworkError(request, error, 'network'))
       }
@@ -405,22 +388,17 @@ export class HttpRequestHandler {
     type: 'network' | 'timeout' | 'validation',
     details?: any
   ): NetworkSecurityError {
-    return new NetworkSecurityError(
-      error.message || 'HTTP request failed',
-      this.getErrorCode(error, type),
-      type,
-      {
-        requestId: request.id,
-        artifactId: request.artifactId,
-        retryable: this.isRetryableError(error, type),
-        details: {
-          originalError: error.message,
-          errorCode: error.code,
-          ...details
-        },
-        cause: error
-      }
-    )
+    return new NetworkSecurityError(error.message || 'HTTP request failed', this.getErrorCode(error, type), type, {
+      requestId: request.id,
+      artifactId: request.artifactId,
+      retryable: this.isRetryableError(error, type),
+      details: {
+        originalError: error.message,
+        errorCode: error.code,
+        ...details
+      },
+      cause: error
+    })
   }
 
   private getErrorCode(error: any, type: string): NetworkErrorCode {
@@ -450,11 +428,11 @@ export class HttpRequestHandler {
   private isRetryableError(error: any, type: string): boolean {
     // Network errors that are typically retryable
     const retryableCodes = [
-      'ECONNRESET',    // Connection reset
-      'ETIMEDOUT',     // Timeout
-      'ENOTFOUND',     // DNS lookup failed
-      'ECONNREFUSED',  // Connection refused
-      'EPIPE',         // Broken pipe
+      'ECONNRESET', // Connection reset
+      'ETIMEDOUT', // Timeout
+      'ENOTFOUND', // DNS lookup failed
+      'ECONNREFUSED', // Connection refused
+      'EPIPE', // Broken pipe
       'SOCKET_TIMEOUT' // Socket timeout
     ]
 

@@ -557,7 +557,11 @@ const AihubmixPage: FC<{ Options: string[] }> = ({ Options }) => {
       }
     }
 
-    removePainting(mode, paintingToDelete)
+    const paintingAction: PaintingAction = {
+      ...paintingToDelete,
+      seed: paintingToDelete.seed !== undefined ? String(paintingToDelete.seed) : undefined
+    }
+    removePainting(mode, paintingAction)
   }
 
   const translate = async () => {
@@ -788,7 +792,11 @@ const AihubmixPage: FC<{ Options: string[] }> = ({ Options }) => {
 
   const onSelectPainting = (newPainting: Painting) => {
     if (generating) return
-    setPainting(newPainting)
+    const paintingAction: PaintingAction = {
+      ...newPainting,
+      seed: newPainting.seed !== undefined ? String(newPainting.seed) : undefined
+    }
+    setPainting(paintingAction)
     setCurrentImageIndex(0)
   }
 

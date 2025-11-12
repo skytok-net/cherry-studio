@@ -23,7 +23,7 @@ import FileManager from '@renderer/services/FileManager'
 import { translateText } from '@renderer/services/TranslateService'
 import { useAppDispatch } from '@renderer/store'
 import { setGenerating } from '@renderer/store/runtime'
-import type { FileMetadata, Painting } from '@renderer/types'
+import type { FileMetadata, Painting, PaintingAction } from '@renderer/types'
 import { getErrorMessage, uuid } from '@renderer/utils'
 import { Button, Input, InputNumber, Radio, Select, Slider, Switch, Tooltip } from 'antd'
 import TextArea from 'antd/es/input/TextArea'
@@ -144,7 +144,11 @@ const SiliconPage: FC<{ Options: string[] }> = ({ Options }) => {
   const updatePaintingState = (updates: Partial<Painting>) => {
     const updatedPainting = { ...painting, ...updates }
     setPainting(updatedPainting)
-    updatePainting('siliconflow_paintings', updatedPainting)
+    const paintingAction: PaintingAction = {
+      ...updatedPainting,
+      seed: updatedPainting.seed !== undefined ? String(updatedPainting.seed) : undefined
+    }
+    updatePainting('siliconflow_paintings', paintingAction)
   }
 
   const onSelectModel = (modelId: string) => {
@@ -202,7 +206,12 @@ const SiliconPage: FC<{ Options: string[] }> = ({ Options }) => {
         negativePrompt: painting.negativePrompt || '',
         imageSize: painting.imageSize || '1024x1024',
         batchSize: painting.numImages || 1,
-        seed: painting.seed || undefined,
+        seed:
+          painting.seed !== undefined
+            ? typeof painting.seed === 'number'
+              ? String(painting.seed)
+              : painting.seed
+            : undefined,
         numInferenceSteps: painting.steps || 25,
         guidanceScale: painting.guidanceScale || 4.5,
         signal: controller.signal,
@@ -280,12 +289,18 @@ const SiliconPage: FC<{ Options: string[] }> = ({ Options }) => {
       }
     }
 
-    removePainting('siliconflow_paintings', paintingToDelete)
+    const paintingAction: PaintingAction = {
+      ...paintingToDelete,
+      seed: paintingToDelete.seed !== undefined ? String(paintingToDelete.seed) : undefined
+    }
+    removePainting('siliconflow_paintings', paintingAction)
   }
 
-  const onSelectPainting = (newPainting: Painting) => {
+  const onSelectPainting = (newPainting: PaintingAction) => {
     if (generating) return
-    setPainting(newPainting)
+    // Find the original painting from state to preserve original types
+    const originalPainting = siliconflow_paintings.find((p) => p.id === newPainting.id) || (newPainting as Painting)
+    setPainting(originalPainting)
     setCurrentImageIndex(0)
   }
 
@@ -521,8 +536,18 @@ const SiliconPage: FC<{ Options: string[] }> = ({ Options }) => {
         </MainContainer>
         <PaintingsList
           namespace="siliconflow_paintings"
-          paintings={siliconflow_paintings}
-          selectedPainting={painting}
+          paintings={
+            siliconflow_paintings.map((p) => ({
+              ...p,
+              seed: p.seed !== undefined ? String(p.seed) : undefined
+            })) as PaintingAction[]
+          }
+          selectedPainting={
+            {
+              ...painting,
+              seed: painting.seed !== undefined ? String(painting.seed) : undefined
+            } as PaintingAction
+          }
           onSelectPainting={onSelectPainting}
           onDeletePainting={onDeletePainting}
           onNewPainting={() => setPainting(addPainting('siliconflow_paintings', getNewPainting()))}

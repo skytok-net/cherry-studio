@@ -11,6 +11,7 @@ import { useRuntime } from '@renderer/hooks/useRuntime'
 import FileManager from '@renderer/services/FileManager'
 import { useAppDispatch } from '@renderer/store'
 import { setGenerating } from '@renderer/store/runtime'
+import type { Painting, PaintingAction } from '@renderer/types'
 import { getErrorMessage, uuid } from '@renderer/utils'
 import { Avatar, Button, InputNumber, Radio, Select } from 'antd'
 import TextArea from 'antd/es/input/TextArea'
@@ -252,9 +253,11 @@ const ZhipuPage: FC<{ Options: string[] }> = ({ Options }) => {
     }
   }
 
-  const onSelectPainting = (newPainting: any) => {
+  const onSelectPainting = (newPainting: PaintingAction) => {
     if (generating) return
-    setPainting(newPainting)
+    // Find the original painting from state to preserve original types
+    const originalPainting = zhipu_paintings.find((p) => p.id === newPainting.id) || (newPainting as Painting)
+    setPainting(originalPainting)
     setCurrentImageIndex(0)
   }
 
@@ -455,7 +458,12 @@ const ZhipuPage: FC<{ Options: string[] }> = ({ Options }) => {
         </MainContainer>
         <PaintingsList
           namespace="zhipu_paintings"
-          paintings={zhipu_paintings}
+          paintings={
+            zhipu_paintings.map((p) => ({
+              ...p,
+              seed: p.seed !== undefined ? String(p.seed) : undefined
+            })) as PaintingAction[]
+          }
           selectedPainting={painting}
           onSelectPainting={onSelectPainting}
           onDeletePainting={onDeletePainting}

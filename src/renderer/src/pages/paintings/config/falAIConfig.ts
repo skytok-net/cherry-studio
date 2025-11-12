@@ -67,4 +67,3 @@ export const DEFAULT_FAL_AI_PAINTING: FalAIPainting = {
   numInferenceSteps: 28,
   status: 'starting'
 }
-

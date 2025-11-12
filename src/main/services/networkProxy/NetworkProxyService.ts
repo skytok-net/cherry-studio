@@ -7,19 +7,17 @@
  */
 
 import type {
+  DomainReputation,
+  NetworkError,
   NetworkRequest,
   NetworkResponse,
-  NetworkError,
   NetworkSettings,
   NetworkStats,
-  SecurityViolation,
-  DomainReputation,
-  RequestStatus
-} from '../../types/networkTypes'
-
-import type { SecurityPolicy, SecurityValidationResult } from '../securityPolicy/SecurityPolicy'
+  RequestStatus,
+  SecurityViolation} from '../../types/networkTypes'
 import type { DomainReputationService } from '../domainReputation/DomainReputationService'
 import type { RequestCache } from '../requestCache/RequestCache'
+import type { SecurityPolicy, SecurityValidationResult } from '../securityPolicy/SecurityPolicy'
 import { HttpRequestHandler } from './HttpRequestHandler'
 
 // ============================================================================
@@ -231,7 +229,6 @@ export class NetworkProxyService {
 
       this.updateStats('success')
       return this.createSuccessResult(context, response)
-
     } catch (error) {
       context.status = 'failed'
       context.endTime = Date.now()
@@ -253,7 +250,6 @@ export class NetworkProxyService {
 
       this.updateStats('error')
       return this.createErrorResult(context, networkError)
-
     } finally {
       this.activeRequests.delete(request.id)
     }
@@ -463,7 +459,6 @@ export class NetworkProxyService {
             finalUrl: request.url
           }
         }
-
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
 
@@ -476,7 +471,10 @@ export class NetworkProxyService {
     throw lastError
   }
 
-  private async performHttpRequest(request: NetworkRequest, headers: Record<string, string>): Promise<{
+  private async performHttpRequest(
+    request: NetworkRequest,
+    headers: Record<string, string>
+  ): Promise<{
     status: number
     statusText: string
     headers: Record<string, string>
@@ -597,7 +595,7 @@ export class NetworkProxyService {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   private initializeStats(): NetworkStats {
@@ -681,18 +679,22 @@ export class NetworkProxyService {
 
   private startRateLimitCleanup(): void {
     // Cleanup expired rate limit entries every 5 minutes
-    setInterval(() => {
-      const now = Date.now()
-      const expiredKeys: string[] = []
+    setInterval(
+      () => {
+        const now = Date.now()
+        const expiredKeys: string[] = []
 
-      this.rateLimitTracker.forEach((entry, key) => {
-        if (now - entry.lastAccess > 5 * 60 * 1000) { // 5 minutes
-          expiredKeys.push(key)
-        }
-      })
+        this.rateLimitTracker.forEach((entry, key) => {
+          if (now - entry.lastAccess > 5 * 60 * 1000) {
+            // 5 minutes
+            expiredKeys.push(key)
+          }
+        })
 
-      expiredKeys.forEach(key => this.rateLimitTracker.delete(key))
-    }, 5 * 60 * 1000)
+        expiredKeys.forEach((key) => this.rateLimitTracker.delete(key))
+      },
+      5 * 60 * 1000
+    )
   }
 
   private startActiveRequestMonitoring(): void {
@@ -755,12 +757,7 @@ export function createNetworkProxyService(
 
   const finalConfig = { ...defaultConfig, ...config }
 
-  return new NetworkProxyService(
-    securityPolicy,
-    domainReputationService,
-    requestCache,
-    finalConfig
-  )
+  return new NetworkProxyService(securityPolicy, domainReputationService, requestCache, finalConfig)
 }
 
 export default NetworkProxyService

@@ -94,7 +94,8 @@ export function extractComponentName(tsx: string): string {
   if (!tsx) return ''
 
   // Try to find function component: function ComponentName() or const ComponentName =
-  const functionComponentRegex = /(?:function|const|export\s+(?:default\s+)?(?:function|const))\s+([A-Z][a-zA-Z0-9]*)\s*[=:(]/
+  const functionComponentRegex =
+    /(?:function|const|export\s+(?:default\s+)?(?:function|const))\s+([A-Z][a-zA-Z0-9]*)\s*[=:(]/
   const functionMatch = tsx.match(functionComponentRegex)
   if (functionMatch && functionMatch[1]) {
     return functionMatch[1]

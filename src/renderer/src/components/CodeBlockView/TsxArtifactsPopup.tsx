@@ -1,22 +1,34 @@
+import { loggerService } from '@logger'
 import type { CodeEditorHandles } from '@renderer/components/CodeEditor'
 import CodeEditor from '@renderer/components/CodeEditor'
 import { CopyIcon, FilePngIcon } from '@renderer/components/Icons'
 import { isMac } from '@renderer/config/constant'
 import { useTemporaryValue } from '@renderer/hooks/useTemporaryValue'
-import { classNames } from '@renderer/utils'
-import { extractComponentName } from '@renderer/utils/formats'
-import { captureScrollableIframeAsBlob, captureScrollableIframeAsDataURL } from '@renderer/utils/image'
-import { loggerService } from '@logger'
+import { getUserMessage } from '@renderer/services/MessagesService'
 import store from '@renderer/store'
+import { useAppDispatch } from '@renderer/store'
 import { messageBlocksSelectors } from '@renderer/store/messageBlock'
 import { selectMessagesForTopic } from '@renderer/store/newMessage'
 import { sendMessage } from '@renderer/store/thunk/messageThunk'
-import { getUserMessage } from '@renderer/services/MessagesService'
+import { classNames } from '@renderer/utils'
+import { extractComponentName } from '@renderer/utils/formats'
+import { captureScrollableIframeAsBlob, captureScrollableIframeAsDataURL } from '@renderer/utils/image'
 import { Button, Dropdown, Modal, Splitter, Tooltip, Typography } from 'antd'
-import { Camera, Check, Code, Copy, Eye, Maximize2, Minimize2, SaveIcon, SquareSplitHorizontal, Wand2, X } from 'lucide-react'
+import {
+  Camera,
+  Check,
+  Code,
+  Copy,
+  Eye,
+  Maximize2,
+  Minimize2,
+  SaveIcon,
+  SquareSplitHorizontal,
+  Wand2,
+  X
+} from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAppDispatch } from '@renderer/store'
 import styled from 'styled-components'
 
 const logger = loggerService.withContext('TsxArtifactsPopup')
@@ -83,6 +95,7 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
   const transpilerTypeRef = useRef<'esbuild' | 'babel' | null>(null)
   const lastErrorRef = useRef<string | null>(null)
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const handleAutoRetryRef = useRef<(() => void) | null>(null)
 
   // Load transpilers from bundled npm packages (more reliable than CDN)
   useEffect(() => {
@@ -176,7 +189,36 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
   }
 
   const transpileAndRender = useCallback(async () => {
-    if (!tsx.trim() || !previewFrameRef.current) return
+    if (!tsx.trim()) return
+
+    // Wait for iframe to be available AND have a document ready (with retry)
+    let retries = 0
+    const maxRetries = 20
+    while (retries < maxRetries) {
+      const iframe = previewFrameRef.current
+      if (iframe && (iframe.contentDocument || iframe.contentWindow?.document)) {
+        // Iframe is ready with a document
+        break
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      retries++
+    }
+
+    const iframe = previewFrameRef.current
+    if (!iframe) {
+      logger.error('Preview iframe is not available after waiting')
+      setPreviewError('Preview iframe failed to initialize. Please try reopening the preview.')
+      setIsTranspiling(false)
+      return
+    }
+
+    // Check if iframe has a document ready
+    if (!iframe.contentDocument && !iframe.contentWindow?.document) {
+      logger.error('Preview iframe document is not ready after waiting')
+      setPreviewError('Preview iframe document failed to initialize. Please try reopening the preview.')
+      setIsTranspiling(false)
+      return
+    }
 
     setIsTranspiling(true)
     setPreviewError(null)
@@ -190,10 +232,10 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       if (!BabelStandalone && !babelLoadedRef.current) {
         BabelStandalone = await loadBabelStandalone()
       }
-      
+
       const esbuild = esbuildWasm
       const Babel = BabelStandalone
-      
+
       if (!esbuild && !Babel) {
         throw new Error('No transpiler loaded. Please ensure dependencies are installed (run: yarn install).')
       }
@@ -209,7 +251,7 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       // - Web APIs (fetch, localStorage, etc.) are available by default
       let processedTsx = tsx
       const importMap: Record<string, string> = {
-        'react': 'React',
+        react: 'React',
         'react-dom': 'ReactDOM',
         '@xyflow/react': 'ReactFlow',
         '@radix-ui/react-dialog': 'RadixUIDialog',
@@ -226,19 +268,20 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
         '@radix-ui/react-switch': 'RadixUISwitch',
         '@radix-ui/react-toast': 'RadixUIToast',
         'class-variance-authority': 'classVarianceAuthority',
-        'clsx': 'clsx',
+        clsx: 'clsx',
         'tailwind-merge': 'tailwindMerge',
         'lucide-react': 'LucideReact'
       }
 
-      // Replace import statements with global variable assignments
+      // Replace import statements with global variable assignments.
+      // To support additional runtime libraries in TSX artifacts, extend this map with the desired global.
       Object.entries(importMap).forEach(([module, globalVar]) => {
         // Match: import X from 'module' or import { X, Y } from 'module'
         const importRegex = new RegExp(
           `import\\s+(?:([\\w*]+)\\s+from\\s+['"]${module.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]|{([^}]+)}\\s+from\\s+['"]${module.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"])`,
           'g'
         )
-        
+
         processedTsx = processedTsx.replace(importRegex, (match, defaultImport, namedImports) => {
           if (defaultImport) {
             return `const ${defaultImport} = window.${globalVar};`
@@ -258,30 +301,83 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       // Remove remaining unknown imports (they'll need to be provided or will error)
       processedTsx = processedTsx.replace(/import\s+.*?from\s+['"][^'"]+['"];?\n?/g, '')
 
-      let transpiledCode: string
+      // Remove type-only imports (import type ...) - these cause issues with esbuild
+      processedTsx = processedTsx.replace(/import\s+type\s+[^'"]+\s+from\s+['"][^'"]+['"];?\n?/g, '')
+
+      const wrapCommonJsModule = (code: string) => `
+(function(){
+  try {
+    const existingKeys = Array.isArray(window.__tsxAssignedKeys) ? window.__tsxAssignedKeys : [];
+    existingKeys.forEach(function(key){
+      try { delete window[key]; } catch (err) {}
+    });
+    window.__tsxAssignedKeys = [];
+    window.__tsxComponent = null;
+    window.__tsxLastModule = null;
+  } catch (err) {}
+
+  const exports = {};
+  const module = { exports };
+  ${code}
+  const resolved = module.exports ?? exports;
+  if (resolved && typeof resolved === 'object') {
+    Object.keys(resolved).forEach(function(key){
+      try {
+        window[key] = resolved[key];
+        window.__tsxAssignedKeys.push(key);
+      } catch (err) {}
+    });
+    if (resolved.default) {
+      window.App = resolved.default;
+      window.__tsxComponent = resolved.default;
+      window.__tsxLastModule = resolved;
+    }
+  }
+  if (!window.__tsxComponent && typeof resolved === 'function') {
+    window.__tsxComponent = resolved;
+  }
+})();
+`
+
+      let transpiledCode: string | null = null
+      let lastTranspileError: unknown = null
 
       if (esbuild) {
-        // Use esbuild (faster, modern) - preferred method
-        // esbuild-wasm exports transform directly
-        const transformResult = await esbuild.transform(processedTsx, {
-          loader: 'tsx',
-          format: 'iife', // Immediately Invoked Function Expression - wraps code in (function() { ... })()
-          target: 'es2020',
-          jsx: 'transform', // Transform JSX to React.createElement calls
-          jsxFactory: 'React.createElement',
-          jsxFragment: 'React.Fragment',
-          globalName: 'window' // Make exports available on window
-        })
-        transpiledCode = transformResult.code || ''
-      } else if (Babel) {
-        // Fallback to Babel if esbuild is not available
-        // @babel/standalone exports Babel.transform directly
-        transpiledCode = Babel.transform(processedTsx, {
-          presets: ['react', 'typescript'],
-          filename: 'component.tsx'
-        }).code
-      } else {
-        throw new Error('Transpiler not available')
+        try {
+          const transformResult = await esbuild.transform(processedTsx, {
+            loader: 'tsx',
+            format: 'cjs',
+            target: 'es2020',
+            jsx: 'transform',
+            jsxFactory: 'React.createElement',
+            jsxFragment: 'React.Fragment'
+          })
+          transpiledCode = wrapCommonJsModule(transformResult.code || '')
+          transpilerTypeRef.current = 'esbuild'
+        } catch (error) {
+          lastTranspileError = error
+          logger.warn('esbuild failed, attempting Babel fallback:', error as Error)
+        }
+      }
+
+      if (!transpiledCode && Babel) {
+        try {
+          const babelResult = Babel.transform(processedTsx, {
+            presets: ['react', ['typescript', { isTSX: true, allExtensions: true }]],
+            plugins: [['@babel/plugin-transform-modules-commonjs', { loose: true }]],
+            filename: 'component.tsx'
+          })
+          transpiledCode = wrapCommonJsModule(babelResult?.code || '')
+          transpilerTypeRef.current = 'babel'
+        } catch (error) {
+          lastTranspileError = error
+        }
+      }
+
+      if (!transpiledCode) {
+        throw lastTranspileError instanceof Error
+          ? lastTranspileError
+          : new Error('Transpilation failed. No transpiler available.')
       }
 
       // Create HTML content with React runtime and libraries
@@ -292,47 +388,17 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>React Component Preview</title>
-  
+
   <!-- React Runtime -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  
-  <!-- Tailwind CSS (for shadcn-ui) -->
+
+  <!-- Tailwind CSS (optional utility styling) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- xyflow/react -->
-  <script crossorigin src="https://unpkg.com/@xyflow/react@1.30.0/dist/index.umd.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/@xyflow/react@1.30.0/dist/style.css">
-  
-  <!-- Utility libraries -->
-  <script src="https://unpkg.com/clsx@2.1.0/dist/clsx.umd.js"></script>
-  <script src="https://unpkg.com/class-variance-authority@0.7.0/dist/index.umd.js"></script>
-  <script src="https://unpkg.com/tailwind-merge@2.2.1/dist/index.umd.js"></script>
-  
-  <!-- Lucide React Icons -->
-  <script crossorigin src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
-  
-  <!-- Radix UI Primitives (for shadcn-ui components) -->
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-dialog@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-dropdown-menu@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-select@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-slot@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-popover@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-tooltip@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-accordion@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-tabs@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-checkbox@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-label@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-separator@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-switch@latest/dist/index.umd.js"></script>
-  <script crossorigin src="https://unpkg.com/@radix-ui/react-toast@latest/dist/index.umd.js"></script>
-  
-  <!-- Radix UI CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/@radix-ui/themes@latest/dist/styles.css">
-  
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    
+
     :root {
       --background: 0 0% 100%;
       --foreground: 222.2 84% 4.9%;
@@ -355,26 +421,26 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       --ring: 222.2 84% 4.9%;
       --radius: 0.5rem;
     }
-    
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif; 
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
       padding: 20px;
       background: hsl(var(--background));
       color: hsl(var(--foreground));
     }
-    
+
     #root { width: 100%; min-height: 100vh; }
-    
-    .error { 
-      color: #ff4d4f; 
-      padding: 20px; 
-      background: #fff2f0; 
-      border: 1px solid #ffccc7; 
-      border-radius: 4px; 
-      margin: 20px 0; 
+
+    .error {
+      color: #ff4d4f;
+      padding: 20px;
+      background: #fff2f0;
+      border: 1px solid #ffccc7;
+      border-radius: 4px;
+      margin: 20px 0;
     }
     .error pre { margin-top: 10px; white-space: pre-wrap; word-break: break-word; }
-    
+
     /* shadcn-ui base styles */
     button {
       border-radius: calc(var(--radius) - 2px);
@@ -443,20 +509,20 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
     window.clsx = window.clsx || function() { return Array.from(arguments).filter(Boolean).join(' '); };
     window.tailwindMerge = window.tailwindMerge || window.clsx;
     window.classVarianceAuthority = window.classVarianceAuthority || function() { return function() { return ''; }; };
-    
+
     // Setup ReactFlow global (xyflow/react)
     if (typeof window.ReactFlow !== 'undefined') {
       // ReactFlow is already available
     } else if (typeof window['@xyflow/react'] !== 'undefined') {
       window.ReactFlow = window['@xyflow/react'];
     }
-    
+
     // Setup Lucide React icons
     if (window.LucideReact) {
       // Icons are available as window.LucideReact.IconName
       // Example: const Button = () => React.createElement(window.LucideReact.Button, {});
     }
-    
+
     // Helper function to merge class names (for shadcn-ui)
     function cn(...inputs) {
       if (window.tailwindMerge && typeof window.tailwindMerge === 'function') {
@@ -465,7 +531,7 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       return inputs.filter(Boolean).join(' ');
     }
     window.cn = cn;
-    
+
     // Helper for ReactFlow - make it easier to use
     if (window.ReactFlow) {
       const ReactFlow = window.ReactFlow;
@@ -473,33 +539,36 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       window.ReactFlowProvider = ReactFlow.ReactFlowProvider || ReactFlow;
       window.ReactFlowCanvas = ReactFlow.ReactFlowCanvas || ReactFlow;
     }
-    
+
     try {
       ${transpiledCode}
-      
+
       // Try to find and render the component using React 18 createRoot
       const rootElement = document.getElementById('root');
       let ComponentToRender = null;
-      
+
       // Check for common component names
-      if (typeof App !== 'undefined') {
-        ComponentToRender = App;
-      } else if (typeof Component !== 'undefined') {
-        ComponentToRender = Component;
-      } else {
-        // Try to find any exported component (function starting with uppercase)
-        const componentNames = Object.keys(window).filter(key => 
-          typeof window[key] === 'function' && 
-          /^[A-Z]/.test(key) &&
-          key !== 'React' &&
-          key !== 'ReactDOM' &&
-          key !== 'cn'
-        );
-        if (componentNames.length > 0) {
-          ComponentToRender = window[componentNames[0]];
-        }
+      const candidates = []
+      if (typeof window.__tsxComponent === 'function') {
+        candidates.push(window.__tsxComponent)
       }
-      
+      if (typeof App === 'function') candidates.push(App)
+      if (typeof Component === 'function') candidates.push(Component)
+      if (typeof window.default === 'function') candidates.push(window.default)
+
+      if (!candidates.length) {
+        const componentNames = Object.keys(window).filter((key) => {
+          if (!/^[A-Z]/.test(key)) return false
+          if (['React', 'ReactDOM', 'cn', 'App', 'Component'].includes(key)) return false
+          return typeof window[key] === 'function'
+        })
+        componentNames.forEach((name) => candidates.push(window[name]))
+      }
+
+      if (candidates.length) {
+        ComponentToRender = candidates[0]
+      }
+
       if (ComponentToRender) {
         // Use React 18 createRoot if available, fallback to render
         if (ReactDOM.createRoot) {
@@ -514,7 +583,7 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       }
     } catch (error) {
       const rootElement = document.getElementById('root');
-      rootElement.innerHTML = '<div class="error"><h3>Rendering Error:</h3><pre>' + 
+      rootElement.innerHTML = '<div class="error"><h3>Rendering Error:</h3><pre>' +
         error.toString() + '\\n\\n' + (error.stack || '') + '</pre></div>';
     }
   </script>
@@ -524,24 +593,90 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
 
       // Update iframe content
       const iframe = previewFrameRef.current
-      if (iframe.contentDocument) {
-        iframe.contentDocument.open()
-        iframe.contentDocument.write(htmlContent)
-        iframe.contentDocument.close()
-      } else if (iframe.contentWindow) {
-        iframe.contentWindow.document.open()
-        iframe.contentWindow.document.write(htmlContent)
-        iframe.contentWindow.document.close()
+      if (!iframe) {
+        throw new Error('Preview iframe is not available')
+      }
+
+      // Wait for iframe to be ready
+      const writeToIframe = () => {
+        if (iframe.contentDocument) {
+          iframe.contentDocument.open()
+          iframe.contentDocument.write(htmlContent)
+          iframe.contentDocument.close()
+        } else if (iframe.contentWindow?.document) {
+          iframe.contentWindow.document.open()
+          iframe.contentWindow.document.write(htmlContent)
+          iframe.contentWindow.document.close()
+        } else {
+          throw new Error('Cannot access iframe document. Iframe may not be fully loaded.')
+        }
+      }
+
+      // Try to write immediately
+      try {
+        writeToIframe()
+      } catch (error) {
+        // If iframe isn't ready, initialize it with blank document and wait for it to load
+        if (iframe.contentWindow) {
+          // Initialize iframe with blank document if it doesn't have one
+          if (!iframe.contentDocument && !iframe.contentWindow.document) {
+            iframe.srcdoc = '<!DOCTYPE html><html><head></head><body></body></html>'
+          }
+
+          // Wait for iframe load event
+          await new Promise<void>((resolve, reject) => {
+            let resolved = false
+
+            const onLoad = () => {
+              if (resolved) return
+              resolved = true
+              clearTimeout(timeout)
+              iframe.removeEventListener('load', onLoad)
+              try {
+                writeToIframe()
+                resolve()
+              } catch (err) {
+                reject(err)
+              }
+            }
+
+            const timeout = setTimeout(() => {
+              if (resolved) return
+              resolved = true
+              iframe.removeEventListener('load', onLoad)
+              reject(new Error('Timeout waiting for iframe to load'))
+            }, 5000)
+
+            iframe.addEventListener('load', onLoad)
+
+            // If already loaded, try immediately
+            if (iframe.contentDocument || iframe.contentWindow?.document) {
+              if (!resolved) {
+                resolved = true
+                clearTimeout(timeout)
+                iframe.removeEventListener('load', onLoad)
+                try {
+                  writeToIframe()
+                  resolve()
+                } catch (err) {
+                  reject(err)
+                }
+              }
+            }
+          })
+        } else {
+          throw error
+        }
       }
     } catch (error) {
       logger.error('Failed to transpile TSX:', error as Error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to transpile TSX code'
       setPreviewError(errorMessage)
       lastErrorRef.current = errorMessage
-      
+
       // Trigger automatic retry if we haven't exceeded max attempts
-      if (retryAttempt < MAX_AUTO_RETRY_ATTEMPTS && blockId) {
-        handleAutoRetry()
+      if (retryAttempt < MAX_AUTO_RETRY_ATTEMPTS && blockId && handleAutoRetryRef.current) {
+        handleAutoRetryRef.current()
       }
     } finally {
       setIsTranspiling(false)
@@ -563,10 +698,10 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
             const errorText = errorElement.textContent || 'Rendering error occurred'
             setPreviewError(errorText)
             lastErrorRef.current = errorText
-            
+
             // Trigger automatic retry if we haven't exceeded max attempts
-            if (retryAttempt < MAX_AUTO_RETRY_ATTEMPTS && blockId) {
-              handleAutoRetry()
+            if (retryAttempt < MAX_AUTO_RETRY_ATTEMPTS && blockId && handleAutoRetryRef.current) {
+              handleAutoRetryRef.current()
             }
           }
         }
@@ -588,12 +723,35 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
     }
   }, [open, retryAttempt, blockId])
 
+  const handleTranspileAndRender = useCallback(() => {
+    // Small delay to ensure iframe is ready
+    setTimeout(() => {
+      transpileAndRender()
+    }, 100)
+  }, [transpileAndRender])
+
   // Transpile and render when TSX content changes
   useEffect(() => {
     if (open && viewMode !== 'code' && tsx.trim()) {
-      handleTranspileAndRender()
+      // Wait for iframe to be mounted AND have a document ready before transpiling
+      const checkAndTranspile = async () => {
+        let attempts = 0
+        const maxAttempts = 30 // Increased to allow more time for iframe to initialize
+        while (attempts < maxAttempts) {
+          const iframe = previewFrameRef.current
+          if (iframe && (iframe.contentDocument || iframe.contentWindow?.document)) {
+            // Iframe is ready with a document
+            handleTranspileAndRender()
+            return
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50))
+          attempts++
+        }
+        logger.warn('Iframe not available for transpilation after waiting')
+      }
+      checkAndTranspile()
     }
-  }, [open, tsx, viewMode])
+  }, [open, tsx, viewMode, handleTranspileAndRender])
 
   // Reset retry attempt when TSX content changes (new code received)
   useEffect(() => {
@@ -615,7 +773,7 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
       // Get all assistants to find the one containing the message
       const state = store.getState()
       const assistants = state.assistants.assistants
-      
+
       // Find the message across all topics
       for (const assistant of assistants) {
         for (const topic of assistant.topics) {
@@ -626,7 +784,7 @@ const TsxArtifactsPopup: React.FC<TsxArtifactsPopupProps> = ({ open, title, tsx,
           }
         }
       }
-      
+
       return null
     } catch (error) {
       logger.error('Failed to get message context:', error as Error)
@@ -667,7 +825,7 @@ Please provide the corrected code in a \`\`\`tsx code block.`
 
       // Send the fix request
       await dispatch(sendMessage(userMessage, blocks, assistant, topic.id))
-      
+
       window.toast.success(t('tsx_artifacts.fix.requested', 'Fix request sent to AI'))
     } catch (error) {
       logger.error('Failed to send fix request:', error as Error)
@@ -678,17 +836,17 @@ Please provide the corrected code in a \`\`\`tsx code block.`
   }, [blockId, tsx, dispatch, t, getMessageContext])
 
   // Automatic retry with LLM fix
-  const handleAutoRetry = useCallback(
-    () => {
-      if (retryAttempt >= MAX_AUTO_RETRY_ATTEMPTS) {
-        logger.info(`Max retry attempts (${MAX_AUTO_RETRY_ATTEMPTS + 1}) reached for TSX artifact`)
-        return
-      }
+  const handleAutoRetry = useCallback(() => {
+    if (retryAttempt >= MAX_AUTO_RETRY_ATTEMPTS) {
+      logger.info(`Max retry attempts (${MAX_AUTO_RETRY_ATTEMPTS + 1}) reached for TSX artifact`)
+      return
+    }
 
-      logger.info(`Auto-retry attempt ${retryAttempt + 1}/${MAX_AUTO_RETRY_ATTEMPTS + 1} for TSX artifact`)
+    logger.info(`Auto-retry attempt ${retryAttempt + 1}/${MAX_AUTO_RETRY_ATTEMPTS + 1} for TSX artifact`)
 
-      // Delay before retry to avoid rapid requests
-      retryTimeoutRef.current = setTimeout(async () => {
+    // Delay before retry to avoid rapid requests
+    retryTimeoutRef.current = setTimeout(
+      async () => {
         const newAttempt = retryAttempt + 1
         setRetryAttempt(newAttempt)
 
@@ -724,17 +882,18 @@ Please provide the corrected code in a \`\`\`tsx code block.`
             setIsFixing(false)
           }
         }
-      }, 2000 * (retryAttempt + 1)) // Exponential backoff: 2s, 4s, 6s, 8s
-    },
-    [retryAttempt, blockId, tsx, dispatch, getMessageContext]
-  )
+      },
+      2000 * (retryAttempt + 1)
+    ) // Exponential backoff: 2s, 4s, 6s, 8s
+  }, [retryAttempt, blockId, tsx, dispatch, getMessageContext])
 
-  const handleTranspileAndRender = useCallback(() => {
-    // Small delay to ensure iframe is ready
-    setTimeout(() => {
-      transpileAndRender()
-    }, 100)
-  }, [transpileAndRender])
+  // Ensure latest handler is available synchronously
+  handleAutoRetryRef.current = handleAutoRetry
+
+  // Store handleAutoRetry in ref so it can be used in other callbacks without dependency issues
+  useEffect(() => {
+    handleAutoRetryRef.current = handleAutoRetry
+  }, [handleAutoRetry])
 
   const handleCapture = useCallback(
     async (to: 'file' | 'clipboard') => {
@@ -825,6 +984,15 @@ Please provide the corrected code in a \`\`\`tsx code block.`
   )
 
   const renderContent = () => {
+    const canRequestFix = Boolean(blockId)
+    const fixButtonDisabled = !canRequestFix || isFixing || retryAttempt >= MAX_AUTO_RETRY_ATTEMPTS
+    const fixButtonTooltip = canRequestFix
+      ? undefined
+      : t(
+          'tsx_artifacts.fix.no_context',
+          'Fix is unavailable because this artifact is not associated with a chat message.'
+        )
+
     const codePanel = (
       <CodeSection>
         <CodeEditor
@@ -878,58 +1046,71 @@ Please provide the corrected code in a \`\`\`tsx code block.`
 
     const previewPanel = (
       <PreviewSection>
-        {isTranspiling ? (
-          <LoadingPreview>
-            <p>{t('tsx_artifacts.transpiling', 'Transpiling and rendering...')}</p>
-          </LoadingPreview>
-        ) : previewError ? (
-          <ErrorPreview>
-            <ErrorHeader>
-              <div>
-                <h3>{t('tsx_artifacts.error.title', 'Preview Error')}</h3>
-                {retryAttempt > 0 && (
-                  <RetryInfo>
-                    {t('tsx_artifacts.retry.attempt', 'Auto-retry attempt {{attempt}}/{{max}}', {
-                      attempt: retryAttempt,
-                      max: MAX_AUTO_RETRY_ATTEMPTS + 1
-                    })}
-                  </RetryInfo>
-                )}
-              </div>
-              {blockId && (
-                <FixButtonContainer>
-                  <Button
-                    type="primary"
-                    icon={<Wand2 size={16} />}
-                    loading={isFixing}
-                    onClick={handleFixCode}
-                    disabled={isFixing || retryAttempt >= MAX_AUTO_RETRY_ATTEMPTS}>
-                    {isFixing
-                      ? t('tsx_artifacts.fix.requesting', 'Requesting fix...')
-                      : t('tsx_artifacts.fix.button', 'Fix Code')}
-                  </Button>
-                </FixButtonContainer>
-              )}
-            </ErrorHeader>
-            <pre>{previewError}</pre>
-            {retryAttempt >= MAX_AUTO_RETRY_ATTEMPTS && (
-              <MaxRetriesMessage>
-                {t('tsx_artifacts.retry.max_reached', 'Maximum retry attempts reached. Please fix manually or request a fix.')}
-              </MaxRetriesMessage>
-            )}
-          </ErrorPreview>
-        ) : tsx.trim() ? (
+        <PreviewFrameContainer>
           <PreviewFrame
             ref={previewFrameRef}
             key={tsx}
             title="TSX Preview"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-presentation"
+            srcDoc="<!DOCTYPE html><html><head></head><body></body></html>"
           />
-        ) : (
-          <EmptyPreview>
-            <p>{t('tsx_artifacts.empty_preview', 'No content to preview')}</p>
-          </EmptyPreview>
-        )}
+          {previewError && (
+            <OverlayContainer>
+              <ErrorOverlay>
+                <ErrorHeader>
+                  <div>
+                    <h3>{t('tsx_artifacts.error.title', 'Preview Error')}</h3>
+                    {retryAttempt > 0 && (
+                      <RetryInfo>
+                        {t('tsx_artifacts.retry.attempt', 'Auto-retry attempt {{attempt}}/{{max}}', {
+                          attempt: retryAttempt,
+                          max: MAX_AUTO_RETRY_ATTEMPTS + 1
+                        })}
+                      </RetryInfo>
+                    )}
+                  </div>
+                  <FixButtonContainer>
+                    <Tooltip title={fixButtonTooltip} mouseLeaveDelay={0}>
+                      <Button
+                        type="primary"
+                        icon={<Wand2 size={16} />}
+                        loading={isFixing}
+                        onClick={handleFixCode}
+                        disabled={fixButtonDisabled}>
+                        {isFixing
+                          ? t('tsx_artifacts.fix.requesting', 'Requesting fix...')
+                          : t('tsx_artifacts.fix.button', 'Fix Code')}
+                      </Button>
+                    </Tooltip>
+                  </FixButtonContainer>
+                </ErrorHeader>
+                <pre>{previewError}</pre>
+                {retryAttempt >= MAX_AUTO_RETRY_ATTEMPTS && (
+                  <MaxRetriesMessage>
+                    {t(
+                      'tsx_artifacts.retry.max_reached',
+                      'Maximum retry attempts reached. Please fix manually or request a fix.'
+                    )}
+                  </MaxRetriesMessage>
+                )}
+              </ErrorOverlay>
+            </OverlayContainer>
+          )}
+          {!previewError && isTranspiling && (
+            <OverlayContainer>
+              <LoadingOverlay>
+                <p>{t('tsx_artifacts.transpiling', 'Transpiling and rendering...')}</p>
+              </LoadingOverlay>
+            </OverlayContainer>
+          )}
+          {!previewError && !isTranspiling && !tsx.trim() && (
+            <OverlayContainer>
+              <EmptyPreview>
+                <p>{t('tsx_artifacts.empty_preview', 'No content to preview')}</p>
+              </EmptyPreview>
+            </OverlayContainer>
+          )}
+        </PreviewFrameContainer>
       </PreviewSection>
     )
 
@@ -1141,6 +1322,12 @@ const PreviewSection = styled.div`
   overflow: hidden;
 `
 
+const PreviewFrameContainer = styled.div`
+  position: relative;
+  width: 100%;
+  height: 100%;
+`
+
 const PreviewFrame = styled.iframe`
   width: 100%;
   height: 100%;
@@ -1148,43 +1335,43 @@ const PreviewFrame = styled.iframe`
   background: white;
 `
 
-const EmptyPreview = styled.div`
-  width: 100%;
-  height: 100%;
+const OverlayContainer = styled.div`
+  position: absolute;
+  inset: 0;
   display: flex;
-  justify-content: center;
   align-items: center;
-  background: var(--color-background-soft);
-  color: var(--color-text-secondary);
-  font-size: 14px;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 24, 32, 0.35);
+  backdrop-filter: blur(3px);
 `
 
-const LoadingPreview = styled.div`
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: var(--color-background-soft);
-  color: var(--color-text-secondary);
-  font-size: 14px;
-`
-
-const ErrorPreview = styled.div`
-  width: 100%;
-  height: 100%;
+const OverlayCard = styled.div`
+  width: min(480px, 100%);
+  max-height: 100%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--color-text);
+  border-radius: 12px;
+  box-shadow:
+    0 18px 32px rgba(15, 23, 42, 0.18),
+    0 8px 16px rgba(15, 23, 42, 0.12);
   padding: 20px;
-  background: #fff2f0;
-  color: #ff4d4f;
-  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow: auto;
+`
 
-  h3 {
-    margin-bottom: 0;
-    font-size: 16px;
-  }
+const LoadingOverlay = styled(OverlayCard)`
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  text-align: center;
+`
+
+const ErrorOverlay = styled(OverlayCard)`
+  background: rgba(255, 242, 240, 0.95);
+  color: #d4380d;
 
   pre {
     white-space: pre-wrap;
@@ -1195,6 +1382,14 @@ const ErrorPreview = styled.div`
     flex: 1;
     margin: 0;
   }
+`
+
+const EmptyPreview = styled(OverlayCard)`
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  text-align: center;
 `
 
 const ErrorHeader = styled.div`
@@ -1246,4 +1441,3 @@ const ToolbarButton = styled(Button)`
 `
 
 export default TsxArtifactsPopup
-

@@ -6,13 +6,12 @@
  */
 
 import type {
-  NetworkRequest,
   NetworkError,
-  SecurityViolation,
   NetworkErrorCode,
-  SecurityViolationType,
-  ReputationLevel
-} from '../types/networkTypes'
+  NetworkRequest,
+  ReputationLevel,
+  SecurityViolation,
+  SecurityViolationType} from '../types/networkTypes'
 
 // ============================================================================
 // Enhanced Error Classes
@@ -86,19 +85,14 @@ export class SecurityViolationError extends NetworkSecurityError {
   public readonly violation: SecurityViolation
 
   constructor(violation: SecurityViolation, options: { cause?: Error } = {}) {
-    super(
-      violation.message,
-      'ERR_MALICIOUS_DOMAIN',
-      'security',
-      {
-        retryable: violation.canOverride,
-        details: { violation },
-        suggestedFix: violation.overrideInstructions,
-        requestId: violation.requestId,
-        artifactId: violation.metadata?.artifactId,
-        cause: options.cause
-      }
-    )
+    super(violation.message, 'ERR_MALICIOUS_DOMAIN', 'security', {
+      retryable: violation.canOverride,
+      details: { violation },
+      suggestedFix: violation.overrideInstructions,
+      requestId: violation.requestId,
+      artifactId: violation.metadata?.artifactId,
+      cause: options.cause
+    })
 
     this.violation = violation
     this.name = 'SecurityViolationError'
@@ -115,17 +109,12 @@ export class RateLimitError extends NetworkSecurityError {
     retryAfter: number,
     options: { requestId?: string; artifactId?: string } = {}
   ) {
-    super(
-      message,
-      'ERR_RATE_LIMIT_EXCEEDED',
-      'rate_limit',
-      {
-        retryable: true,
-        details: { resetTime, retryAfter },
-        suggestedFix: `Try again in ${retryAfter} seconds`,
-        ...options
-      }
-    )
+    super(message, 'ERR_RATE_LIMIT_EXCEEDED', 'rate_limit', {
+      retryable: true,
+      details: { resetTime, retryAfter },
+      suggestedFix: `Try again in ${retryAfter} seconds`,
+      ...options
+    })
 
     this.resetTime = resetTime
     this.retryAfter = retryAfter
@@ -139,18 +128,19 @@ export class RateLimitError extends NetworkSecurityError {
 
 export class UrlValidator {
   private static readonly ALLOWED_PROTOCOLS = new Set(['http:', 'https:'])
-  private static readonly BLOCKED_PORTS = new Set([
-    22, 23, 25, 53, 135, 139, 445, 1433, 1521, 3306, 3389, 5432
-  ])
+  private static readonly BLOCKED_PORTS = new Set([22, 23, 25, 53, 135, 139, 445, 1433, 1521, 3306, 3389, 5432])
 
   /**
    * Validate URL format and security
    */
-  static validateUrl(url: string, options: {
-    allowHttp?: boolean
-    blockPrivateNetworks?: boolean
-    customBlockedPorts?: number[]
-  } = {}): UrlValidationResult {
+  static validateUrl(
+    url: string,
+    options: {
+      allowHttp?: boolean
+      blockPrivateNetworks?: boolean
+      customBlockedPorts?: number[]
+    } = {}
+  ): UrlValidationResult {
     const errors: string[] = []
     const warnings: string[] = []
 
@@ -194,7 +184,6 @@ export class UrlValidator {
         port,
         protocol: urlObj.protocol
       }
-
     } catch (error) {
       return {
         valid: false,
@@ -219,22 +208,23 @@ export class UrlValidator {
 
     // Private IP ranges (IPv4)
     const privateRanges = [
-      /^10\./,                          // 10.0.0.0/8
-      /^172\.(1[6-9]|2[0-9]|3[01])\./,  // 172.16.0.0/12
-      /^192\.168\./,                    // 192.168.0.0/16
-      /^127\./,                         // 127.0.0.0/8 (loopback)
-      /^169\.254\./                     // 169.254.0.0/16 (link-local)
+      /^10\./, // 10.0.0.0/8
+      /^172\.(1[6-9]|2[0-9]|3[01])\./, // 172.16.0.0/12
+      /^192\.168\./, // 192.168.0.0/16
+      /^127\./, // 127.0.0.0/8 (loopback)
+      /^169\.254\./ // 169.254.0.0/16 (link-local)
     ]
 
     // IPv6 private ranges
     const ipv6PrivateRanges = [
-      /^::1$/,          // Loopback
+      /^::1$/, // Loopback
       /^fc[0-9a-f]{2}:/i, // Unique local
-      /^fe80:/i         // Link-local
+      /^fe80:/i // Link-local
     ]
 
-    return privateRanges.some(range => range.test(hostname)) ||
-           ipv6PrivateRanges.some(range => range.test(hostname))
+    return (
+      privateRanges.some((range) => range.test(hostname)) || ipv6PrivateRanges.some((range) => range.test(hostname))
+    )
   }
 
   /**
@@ -264,10 +254,14 @@ export class UrlValidator {
 
     // Default ports
     switch (url.protocol) {
-      case 'http:': return 80
-      case 'https:': return 443
-      case 'ftp:': return 21
-      default: return 0
+      case 'http:':
+        return 80
+      case 'https:':
+        return 443
+      case 'ftp:':
+        return 21
+      default:
+        return 0
     }
   }
 }
@@ -549,11 +543,11 @@ export class ErrorAnalyzer {
 
   private static getSeverityFromType(type: string): 'low' | 'medium' | 'high' | 'critical' {
     const severityMap: Record<string, 'low' | 'medium' | 'high' | 'critical'> = {
-      'network': 'medium',
-      'security': 'high',
-      'rate_limit': 'low',
-      'timeout': 'low',
-      'validation': 'medium'
+      network: 'medium',
+      security: 'high',
+      rate_limit: 'low',
+      timeout: 'low',
+      validation: 'medium'
     }
 
     return severityMap[type] || 'medium'
@@ -561,11 +555,11 @@ export class ErrorAnalyzer {
 
   private static getSuggestedActions(type: string): string[] {
     const actionMap: Record<string, string[]> = {
-      'network': ['Check internet connection', 'Verify the URL is correct', 'Try again later'],
-      'security': ['Contact administrator', 'Use a different domain', 'Check security settings'],
-      'rate_limit': ['Wait before retrying', 'Reduce request frequency', 'Check rate limits'],
-      'timeout': ['Try again with longer timeout', 'Check network speed', 'Verify server status'],
-      'validation': ['Check request format', 'Verify all required fields', 'Review API documentation']
+      network: ['Check internet connection', 'Verify the URL is correct', 'Try again later'],
+      security: ['Contact administrator', 'Use a different domain', 'Check security settings'],
+      rate_limit: ['Wait before retrying', 'Reduce request frequency', 'Check rate limits'],
+      timeout: ['Try again with longer timeout', 'Check network speed', 'Verify server status'],
+      validation: ['Check request format', 'Verify all required fields', 'Review API documentation']
     }
 
     return actionMap[type] || ['Try again later', 'Contact support if problem persists']
@@ -573,11 +567,11 @@ export class ErrorAnalyzer {
 
   private static getRecoveryTime(type: string): number {
     const recoveryTimeMap: Record<string, number> = {
-      'network': 30000,      // 30 seconds
-      'security': 0,         // Manual intervention required
-      'rate_limit': 60000,   // 1 minute
-      'timeout': 10000,      // 10 seconds
-      'validation': 0        // Immediate fix required
+      network: 30000, // 30 seconds
+      security: 0, // Manual intervention required
+      rate_limit: 60000, // 1 minute
+      timeout: 10000, // 10 seconds
+      validation: 0 // Immediate fix required
     }
 
     return recoveryTimeMap[type] || 30000
@@ -585,11 +579,11 @@ export class ErrorAnalyzer {
 
   private static getUserFriendlyMessage(message: string, type: string): string {
     const friendlyMessages: Record<string, string> = {
-      'network': 'Unable to connect to the requested service. Please check your internet connection.',
-      'security': 'This request has been blocked for security reasons.',
-      'rate_limit': 'Too many requests. Please wait a moment before trying again.',
-      'timeout': 'The request took too long to complete. Please try again.',
-      'validation': 'The request contains invalid data. Please check your input.'
+      network: 'Unable to connect to the requested service. Please check your internet connection.',
+      security: 'This request has been blocked for security reasons.',
+      rate_limit: 'Too many requests. Please wait a moment before trying again.',
+      timeout: 'The request took too long to complete. Please try again.',
+      validation: 'The request contains invalid data. Please check your input.'
     }
 
     return friendlyMessages[type] || message
@@ -685,7 +679,7 @@ export function isRetryableError(error: Error | NetworkError): boolean {
 
   // Check for known retryable error codes
   const retryableCodes = ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED']
-  return retryableCodes.some(code => error.message.includes(code))
+  return retryableCodes.some((code) => error.message.includes(code))
 }
 
 /**

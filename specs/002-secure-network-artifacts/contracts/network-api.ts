@@ -11,14 +11,7 @@
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
-export type RequestStatus =
-  | 'pending'
-  | 'validating'
-  | 'approved'
-  | 'executing'
-  | 'completed'
-  | 'failed'
-  | 'cached'
+export type RequestStatus = 'pending' | 'validating' | 'approved' | 'executing' | 'completed' | 'failed' | 'cached'
 
 export type ReputationLevel = 'trusted' | 'unknown' | 'suspicious' | 'blocked'
 
@@ -137,7 +130,10 @@ export interface NetworkApiMethods {
    * @param reason - User-provided reason
    * @returns Promise resolving to override confirmation
    */
-  'network:overrideBlock': (domain: string, reason: string) => Promise<{
+  'network:overrideBlock': (
+    domain: string,
+    reason: string
+  ) => Promise<{
     success: boolean
     expiresAt: number
   }>
@@ -179,11 +175,7 @@ export interface NetworkApiEvents {
    * Request status update
    * Emitted when request status changes
    */
-  'network:requestUpdate': (data: {
-    requestId: string
-    status: RequestStatus
-    progress?: number
-  }) => void
+  'network:requestUpdate': (data: { requestId: string; status: RequestStatus; progress?: number }) => void
 
   /**
    * Security violation detected
@@ -201,11 +193,7 @@ export interface NetworkApiEvents {
    * Rate limit warning
    * Emitted when approaching rate limits
    */
-  'network:rateLimitWarning': (data: {
-    artifactId: string
-    remaining: number
-    resetTime: number
-  }) => void
+  'network:rateLimitWarning': (data: { artifactId: string; remaining: number; resetTime: number }) => void
 }
 
 // ============================================================================
@@ -239,7 +227,7 @@ export const NetworkErrorCodes = {
   PROXY_SERVICE_UNAVAILABLE: 'ERR_PROXY_SERVICE_UNAVAILABLE'
 } as const
 
-export type NetworkErrorCode = typeof NetworkErrorCodes[keyof typeof NetworkErrorCodes]
+export type NetworkErrorCode = (typeof NetworkErrorCodes)[keyof typeof NetworkErrorCodes]
 
 // ============================================================================
 // Type Guards
@@ -272,6 +260,6 @@ export const SUPPORTED_PROTOCOLS = ['http:', 'https:'] as const
 export const BLOCKED_PORTS = [22, 23, 25, 53, 135, 139, 445, 1433, 1521, 3306, 3389, 5432] as const
 export const DEFAULT_HEADERS = {
   'User-Agent': 'Cherry-Studio-Artifact/1.0',
-  'Accept': 'application/json, text/plain, */*',
+  Accept: 'application/json, text/plain, */*',
   'Accept-Language': 'en-US,en;q=0.9'
 } as const

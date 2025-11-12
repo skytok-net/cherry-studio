@@ -14,9 +14,9 @@ import FileManager from '@renderer/services/FileManager'
 import { translateText } from '@renderer/services/TranslateService'
 import { useAppDispatch } from '@renderer/store'
 import { setGenerating } from '@renderer/store/runtime'
-import type { FalAIPainting } from '@renderer/types'
+import type { FalAIPainting, PaintingAction } from '@renderer/types'
 import { getErrorMessage, uuid } from '@renderer/utils'
-import { Avatar, Button, Input, InputNumber, Select, Tooltip } from 'antd'
+import { Avatar, Button, InputNumber, Select, Tooltip } from 'antd'
 import TextArea from 'antd/es/input/TextArea'
 import { Info } from 'lucide-react'
 import type { FC } from 'react'
@@ -80,7 +80,11 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
     (updates: Partial<FalAIPainting>) => {
       setPainting((prevPainting) => {
         const updatedPainting = { ...prevPainting, ...updates }
-        updatePainting('falai_paintings', updatedPainting)
+        const paintingAction: PaintingAction = {
+          ...updatedPainting,
+          seed: updatedPainting.seed !== undefined ? String(updatedPainting.seed) : undefined
+        }
+        updatePainting('falai_paintings', paintingAction)
         return updatedPainting
       })
     },
@@ -135,13 +139,15 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
     }
   }
 
-  const onSelectPainting = (newPainting: FalAIPainting) => {
+  const onSelectPainting = (newPainting: PaintingAction) => {
     if (generating) return
-    setPainting(newPainting)
+    // Find the original painting from state to preserve original types
+    const originalPainting = falaiPaintings.find((p) => p.id === newPainting.id) || (newPainting as FalAIPainting)
+    setPainting(originalPainting)
 
     // Set selected model if available
-    if (newPainting.model) {
-      const model = models.find((m) => m.id === newPainting.model)
+    if (originalPainting.model) {
+      const model = models.find((m) => m.id === originalPainting.model)
       if (model) {
         setSelectedModel(model)
       }
@@ -173,7 +179,11 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
   useEffect(() => {
     if (falaiPaintings.length === 0) {
       const newPainting = getNewPainting()
-      addPainting('falai_paintings', newPainting)
+      const paintingAction: PaintingAction = {
+        ...newPainting,
+        seed: newPainting.seed !== undefined ? String(newPainting.seed) : undefined
+      }
+      addPainting('falai_paintings', paintingAction)
       setPainting(newPainting)
     }
   }, [falaiPaintings, addPainting, getNewPainting])
@@ -255,7 +265,12 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
         image_size: painting.imageSize || '1024x1024',
         num_inference_steps: painting.numInferenceSteps || selectedModel.defaultNumInferenceSteps,
         guidance_scale: painting.guidanceScale || selectedModel.defaultGuidanceScale,
-        seed: painting.seed || undefined,
+        seed:
+          painting.seed !== undefined
+            ? typeof painting.seed === 'string'
+              ? Number(painting.seed)
+              : painting.seed
+            : undefined,
         num_images: painting.numImages || 1
       }
 
@@ -307,8 +322,13 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
   }
 
   const handleAddPainting = () => {
-    const newPainting = addPainting('falai_paintings', getNewPainting())
-    updatePainting('falai_paintings', newPainting)
+    const newPainting = getNewPainting()
+    const paintingAction: PaintingAction = {
+      ...newPainting,
+      seed: newPainting.seed !== undefined ? String(newPainting.seed) : undefined
+    }
+    addPainting('falai_paintings', paintingAction)
+    updatePainting('falai_paintings', paintingAction)
     setPainting(newPainting)
     return newPainting
   }
@@ -324,7 +344,11 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
       }
     }
 
-    removePainting('falai_paintings', paintingToDelete)
+    const paintingAction: PaintingAction = {
+      ...paintingToDelete,
+      seed: paintingToDelete.seed !== undefined ? String(paintingToDelete.seed) : undefined
+    }
+    removePainting('falai_paintings', paintingAction)
   }
 
   if (!falaiProvider) {
@@ -334,9 +358,7 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
           <NavbarCenter>{t('paintings.title')}</NavbarCenter>
         </Navbar>
         <ContentContainer>
-          <div style={{ padding: '20px', textAlign: 'center' }}>
-            {t('error.provider_not_found')}
-          </div>
+          <div style={{ padding: '20px', textAlign: 'center' }}>{t('error.provider_not_found')}</div>
         </ContentContainer>
       </Container>
     )
@@ -545,9 +567,19 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
 
         <PaintingsList
           namespace="falai_paintings"
-          paintings={falaiPaintings}
-          selectedPainting={painting}
-          onSelectPainting={onSelectPainting as any}
+          paintings={
+            falaiPaintings.map((p) => ({
+              ...p,
+              seed: p.seed !== undefined ? String(p.seed) : undefined
+            })) as PaintingAction[]
+          }
+          selectedPainting={
+            {
+              ...painting,
+              seed: painting.seed !== undefined ? String(painting.seed) : undefined
+            } as PaintingAction
+          }
+          onSelectPainting={onSelectPainting}
           onDeletePainting={onDeletePainting as any}
           onNewPainting={handleAddPainting}
         />
@@ -692,4 +724,3 @@ const ProviderTitleContainer = styled.div`
 `
 
 export default FalAIPage
-

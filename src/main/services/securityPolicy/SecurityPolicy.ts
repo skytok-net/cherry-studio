@@ -5,11 +5,7 @@
  * private network access controls, and security violation handling.
  */
 
-import type {
-  NetworkRequest,
-  SecurityViolation,
-  NetworkSettings
-} from '../../types/networkTypes'
+import type { NetworkRequest, NetworkSettings,SecurityViolation } from '../../types/networkTypes'
 
 // ============================================================================
 // Security Policy Configuration
@@ -232,8 +228,8 @@ export class SecurityPolicy {
       warnings.push(...customResults.warnings)
 
       // Determine final result
-      const blocked = violations.some(v => !v.canOverride)
-      const requiresApproval = violations.some(v => v.canOverride) && !blocked
+      const blocked = violations.some((v) => !v.canOverride)
+      const requiresApproval = violations.some((v) => v.canOverride) && !blocked
 
       return {
         allowed: violations.length === 0,
@@ -245,24 +241,25 @@ export class SecurityPolicy {
           enforcementLevel: this.config.enforcementLevel
         }
       }
-
     } catch (error) {
       return {
         allowed: false,
-        violations: [{
-          requestId: request.id,
-          violationType: 'invalid_protocol',
-          message: `Invalid URL format: ${error instanceof Error ? error.message : String(error)}`,
-          canOverride: false,
-          timestamp: Date.now(),
-          metadata: {
-            artifactId: request.artifactId,
-            url: request.url,
-            severity: 'high',
-            riskScore: 8,
-            detectionSource: ['url_parser']
+        violations: [
+          {
+            requestId: request.id,
+            violationType: 'invalid_protocol',
+            message: `Invalid URL format: ${error instanceof Error ? error.message : String(error)}`,
+            canOverride: false,
+            timestamp: Date.now(),
+            metadata: {
+              artifactId: request.artifactId,
+              url: request.url,
+              severity: 'high',
+              riskScore: 8,
+              detectionSource: ['url_parser']
+            }
           }
-        }],
+        ],
         warnings: [],
         requiresUserApproval: false,
         metadata: { parseError: true }
@@ -305,7 +302,7 @@ export class SecurityPolicy {
    * Remove custom security rule
    */
   removeCustomRule(ruleId: string): boolean {
-    const index = this.customRules.findIndex(rule => rule.id === ruleId)
+    const index = this.customRules.findIndex((rule) => rule.id === ruleId)
     if (index >= 0) {
       this.customRules.splice(index, 1)
       return true
@@ -324,7 +321,7 @@ export class SecurityPolicy {
    * Get active custom rules
    */
   getCustomRules(): SecurityRule[] {
-    return this.customRules.filter(rule => rule.enabled)
+    return this.customRules.filter((rule) => rule.enabled)
   }
 
   // ============================================================================
@@ -346,10 +343,7 @@ export class SecurityPolicy {
         'api.github.com'
       ]),
       blacklistedDomains: new Set(),
-      trustedDomains: new Set([
-        'api.openweathermap.org',
-        'api.github.com'
-      ]),
+      trustedDomains: new Set(['api.openweathermap.org', 'api.github.com']),
 
       allowedProtocols: new Set(['http:', 'https:']),
       blockedPorts: new Set([22, 23, 25, 53, 135, 139, 445, 1433, 1521, 3306, 3389, 5432]),
@@ -391,7 +385,7 @@ export class SecurityPolicy {
       return true
     }
 
-    return privateRanges.some(range => range.test(hostname))
+    return privateRanges.some((range) => range.test(hostname))
   }
 
   private async applyCustomRules(request: NetworkRequest): Promise<{
@@ -438,7 +432,7 @@ export class SecurityPolicy {
   private evaluateRuleConditions(conditions: SecurityCondition[], request: NetworkRequest): boolean {
     // For now, implement basic condition evaluation
     // This would be expanded with more sophisticated rule evaluation
-    return conditions.every(condition => {
+    return conditions.every((condition) => {
       try {
         const url = new URL(request.url)
 

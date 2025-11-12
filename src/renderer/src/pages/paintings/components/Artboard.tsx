@@ -1,6 +1,6 @@
 import ImageViewer from '@renderer/components/ImageViewer'
 import FileManager from '@renderer/services/FileManager'
-import type { Painting } from '@renderer/types'
+import type { Painting, PaintingAction } from '@renderer/types'
 import { Button, Spin } from 'antd'
 import type { FC } from 'react'
 import React from 'react'
@@ -8,13 +8,13 @@ import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 
 interface ArtboardProps {
-  painting: Painting
+  painting: Painting | PaintingAction
   isLoading: boolean
   currentImageIndex: number
   onPrevImage: () => void
   onNextImage: () => void
   onCancel: () => void
-  retry?: (painting: Painting) => void
+  retry?: (painting: Painting | PaintingAction) => void
   imageCover?: React.ReactNode
   loadText?: React.ReactNode
 }

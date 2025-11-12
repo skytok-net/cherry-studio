@@ -1,6 +1,6 @@
 import { loggerService } from '@logger'
 import { CacheService } from '@renderer/services/CacheService'
-import type { FileMetadata, FalAIPainting } from '@renderer/types'
+import type { FalAIPainting,FileMetadata } from '@renderer/types'
 
 import type { FalAIModel } from '../config/falAIConfig'
 
@@ -51,7 +51,7 @@ export class FalAIService {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
       const errorMessage = errorData.detail?.message || errorData.message || `HTTP ${response.status}: Request failed`
-      
+
       if (response.status === 401) {
         throw new Error('Invalid API key. Please check your fal.ai API key.')
       } else if (response.status === 403) {
@@ -59,7 +59,7 @@ export class FalAIService {
       } else if (response.status === 429) {
         throw new Error('Rate limit exceeded. Please try again later.')
       }
-      
+
       throw new Error(errorMessage)
     }
     return response.json()
@@ -127,13 +127,9 @@ export class FalAIService {
   /**
    * Create a new image generation request
    */
-  async createGeneration(
-    modelId: string,
-    request: FalAIGenerationRequest,
-    signal?: AbortSignal
-  ): Promise<string> {
+  async createGeneration(modelId: string, request: FalAIGenerationRequest, signal?: AbortSignal): Promise<string> {
     const url = `${this.apiHost}/${modelId}`
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -155,7 +151,7 @@ export class FalAIService {
    */
   async getGenerationResult(modelId: string, requestId: string): Promise<FalAIPollResponse> {
     const url = `https://queue.fal.run/${modelId}/${requestId}`
-    
+
     const response = await fetch(url, {
       headers: {
         Authorization: `Key ${this.apiKey}`
@@ -289,4 +285,3 @@ export class FalAIService {
 }
 
 export default FalAIService
-

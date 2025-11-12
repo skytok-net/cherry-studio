@@ -12,10 +12,10 @@ import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 
 interface PaintingsListProps {
-  paintings: Painting[]
-  selectedPainting: Painting
-  onSelectPainting: (painting: Painting) => void
-  onDeletePainting: (painting: Painting) => void
+  paintings: PaintingAction[]
+  selectedPainting: PaintingAction
+  onSelectPainting: (painting: PaintingAction) => void
+  onDeletePainting: (painting: PaintingAction) => void
   onNewPainting: () => void
   namespace: keyof PaintingsState
 }
@@ -44,7 +44,7 @@ const PaintingsList: FC<PaintingsListProps> = ({
         onUpdate={(value) => updatePaintings(namespace, value)}
         onDragStart={() => setDragging(true)}
         onDragEnd={() => setDragging(false)}>
-        {(item: Painting) => (
+        {(item: PaintingAction) => (
           <CanvasWrapper key={item.id}>
             <Canvas
               className={classNames(selectedPainting.id === item.id && 'selected')}

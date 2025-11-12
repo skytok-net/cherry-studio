@@ -211,7 +211,7 @@ export const ReputationErrorCodes = {
   UNKNOWN_ERROR: 'UNKNOWN_ERROR'
 } as const
 
-export type ReputationErrorCode = typeof ReputationErrorCodes[keyof typeof ReputationErrorCodes]
+export type ReputationErrorCode = (typeof ReputationErrorCodes)[keyof typeof ReputationErrorCodes]
 
 export class ReputationError extends Error {
   constructor(
@@ -229,7 +229,10 @@ export class ReputationError extends Error {
 // ============================================================================
 
 export function normalizeDomain(domain: string): string {
-  return domain.toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+  return domain
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
 }
 
 export function calculateConfidence(sources: ReputationSource[]): number {
@@ -253,19 +256,16 @@ export function calculateConfidence(sources: ReputationSource[]): number {
   return Math.min(1, weightedScore / totalWeight)
 }
 
-export function determineReputationLevel(
-  sources: ReputationSource[],
-  confidence: number
-): ReputationLevel {
+export function determineReputationLevel(sources: ReputationSource[], confidence: number): ReputationLevel {
   if (confidence < 0.3) return 'unknown'
 
-  const hasBlocked = sources.some(s => s.verdict === 'malicious' && s.score > 0.7)
+  const hasBlocked = sources.some((s) => s.verdict === 'malicious' && s.score > 0.7)
   if (hasBlocked) return 'blocked'
 
-  const hasSuspicious = sources.some(s => s.verdict === 'suspicious' && s.score > 0.5)
+  const hasSuspicious = sources.some((s) => s.verdict === 'suspicious' && s.score > 0.5)
   if (hasSuspicious) return 'suspicious'
 
-  const hasTrusted = sources.some(s => s.verdict === 'clean' && s.score < 0.2)
+  const hasTrusted = sources.some((s) => s.verdict === 'clean' && s.score < 0.2)
   if (hasTrusted && confidence > 0.8) return 'trusted'
 
   return 'unknown'

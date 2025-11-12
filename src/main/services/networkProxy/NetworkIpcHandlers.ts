@@ -5,19 +5,19 @@
  * Handles communication between renderer process and network proxy service.
  */
 
-import { ipcMain, BrowserWindow } from 'electron'
+import { BrowserWindow,ipcMain } from 'electron'
+
 import type {
+  DomainReputation,
+  NetworkError,
   NetworkRequest,
   NetworkResponse,
-  NetworkError,
   NetworkSettings,
-  DomainReputation,
   NetworkStats,
   SecurityViolation
 } from '../../types/networkTypes'
-
-import type { NetworkProxyService } from './NetworkProxyService'
 import type { SecurityPolicy } from '../securityPolicy/SecurityPolicy'
+import type { NetworkProxyService } from './NetworkProxyService'
 
 // ============================================================================
 // IPC Handler Implementation
@@ -60,7 +60,7 @@ export class NetworkIpcHandlers {
       'network:overrideBlock'
     ]
 
-    handlers.forEach(handler => {
+    handlers.forEach((handler) => {
       ipcMain.removeAllListeners(handler)
     })
   }
@@ -107,7 +107,6 @@ export class NetworkIpcHandlers {
         } else {
           throw new Error('Network proxy returned invalid result')
         }
-
       } catch (error) {
         // Emit status update
         this.emitRequestUpdate(event.sender, request.id, 'failed')
@@ -130,7 +129,6 @@ export class NetworkIpcHandlers {
         }
 
         return await this.networkProxy.checkDomain(domain)
-
       } catch (error) {
         console.error('Domain check failed:', error)
         throw error
@@ -149,34 +147,36 @@ export class NetworkIpcHandlers {
     })
 
     // Update settings
-    ipcMain.handle('network:updateSettings', async (_event, settingsUpdate: Partial<NetworkSettings>): Promise<NetworkSettings> => {
-      try {
-        // Validate settings update
-        this.validateSettingsUpdate(settingsUpdate)
+    ipcMain.handle(
+      'network:updateSettings',
+      async (_event, settingsUpdate: Partial<NetworkSettings>): Promise<NetworkSettings> => {
+        try {
+          // Validate settings update
+          this.validateSettingsUpdate(settingsUpdate)
 
-        // Merge with current settings
-        const newSettings: NetworkSettings = {
-          ...this.currentSettings,
-          ...settingsUpdate
+          // Merge with current settings
+          const newSettings: NetworkSettings = {
+            ...this.currentSettings,
+            ...settingsUpdate
+          }
+
+          // Update network proxy and security policy
+          await this.networkProxy.updateSettings(newSettings)
+          this.securityPolicy.updateConfig(newSettings)
+
+          // Store updated settings
+          this.currentSettings = newSettings
+
+          // Emit settings changed event to all windows
+          this.broadcastSettingsChanged(newSettings)
+
+          return newSettings
+        } catch (error) {
+          console.error('Settings update failed:', error)
+          throw error
         }
-
-        // Update network proxy and security policy
-        await this.networkProxy.updateSettings(newSettings)
-        this.securityPolicy.updateConfig(newSettings)
-
-        // Store updated settings
-        this.currentSettings = newSettings
-
-        // Emit settings changed event to all windows
-        this.broadcastSettingsChanged(newSettings)
-
-        return newSettings
-
-      } catch (error) {
-        console.error('Settings update failed:', error)
-        throw error
       }
-    })
+    )
   }
 
   // ============================================================================
@@ -197,7 +197,6 @@ export class NetworkIpcHandlers {
         } else {
           return await cacheService.clear()
         }
-
       } catch (error) {
         console.error('Cache clear failed:', error)
         throw error
@@ -225,32 +224,38 @@ export class NetworkIpcHandlers {
   // ============================================================================
 
   private registerSecurityHandlers(): void {
-    ipcMain.handle('network:overrideBlock', async (_event, domain: string, reason: string): Promise<{
-      success: boolean
-      expiresAt: number
-    }> => {
-      try {
-        if (!domain || typeof domain !== 'string') {
-          throw new Error('Invalid domain provided')
+    ipcMain.handle(
+      'network:overrideBlock',
+      async (
+        _event,
+        domain: string,
+        reason: string
+      ): Promise<{
+        success: boolean
+        expiresAt: number
+      }> => {
+        try {
+          if (!domain || typeof domain !== 'string') {
+            throw new Error('Invalid domain provided')
+          }
+
+          if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+            throw new Error('Override reason is required')
+          }
+
+          // Create session override (1 hour duration)
+          const override = this.securityPolicy.createSessionOverride(domain, reason, 3600000)
+
+          return {
+            success: true,
+            expiresAt: override.expiresAt
+          }
+        } catch (error) {
+          console.error('Security override failed:', error)
+          throw error
         }
-
-        if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-          throw new Error('Override reason is required')
-        }
-
-        // Create session override (1 hour duration)
-        const override = this.securityPolicy.createSessionOverride(domain, reason, 3600000)
-
-        return {
-          success: true,
-          expiresAt: override.expiresAt
-        }
-
-      } catch (error) {
-        console.error('Security override failed:', error)
-        throw error
       }
-    })
+    )
   }
 
   // ============================================================================
@@ -266,14 +271,13 @@ export class NetworkIpcHandlers {
   }
 
   private emitSecurityViolations(sender: Electron.WebContents, violations: SecurityViolation[]): void {
-    violations.forEach(violation => {
+    violations.forEach((violation) => {
       sender.send('network:securityViolation', violation)
     })
   }
 
-
   private broadcastSettingsChanged(settings: NetworkSettings): void {
-    BrowserWindow.getAllWindows().forEach(window => {
+    BrowserWindow.getAllWindows().forEach((window) => {
       if (!window.isDestroyed()) {
         window.webContents.send('network:settingsChanged', settings)
       }
@@ -349,7 +353,7 @@ export class NetworkIpcHandlers {
     ]
 
     // Check for invalid keys
-    const invalidKeys = Object.keys(settings).filter(key => !validKeys.includes(key))
+    const invalidKeys = Object.keys(settings).filter((key) => !validKeys.includes(key))
     if (invalidKeys.length > 0) {
       throw new Error(`Invalid settings keys: ${invalidKeys.join(', ')}`)
     }
@@ -392,11 +396,11 @@ export class NetworkIpcHandlers {
 
   private mapErrorTypeToCode(type: string): string {
     const errorCodeMap: Record<string, string> = {
-      'network': 'ERR_CONNECTION_FAILED',
-      'security': 'ERR_MALICIOUS_DOMAIN',
-      'rate_limit': 'ERR_RATE_LIMIT_EXCEEDED',
-      'timeout': 'ERR_TIMEOUT',
-      'validation': 'ERR_INVALID_URL'
+      network: 'ERR_CONNECTION_FAILED',
+      security: 'ERR_MALICIOUS_DOMAIN',
+      rate_limit: 'ERR_RATE_LIMIT_EXCEEDED',
+      timeout: 'ERR_TIMEOUT',
+      validation: 'ERR_INVALID_URL'
     }
 
     return errorCodeMap[type] || 'ERR_UNKNOWN'
@@ -438,7 +442,7 @@ export class NetworkRateLimitMonitor {
   }
 
   private emitRateLimitWarnings(stats: NetworkStats): void {
-    BrowserWindow.getAllWindows().forEach(window => {
+    BrowserWindow.getAllWindows().forEach((window) => {
       if (!window.isDestroyed()) {
         window.webContents.send('network:rateLimitWarning', {
           artifactId: 'global', // TODO: Track per artifact

@@ -14,7 +14,6 @@ export type AnthropicSearchConfig = NonNullable<Parameters<typeof anthropic.tool
 export type GoogleSearchConfig = NonNullable<Parameters<typeof google.tools.googleSearch>[0]>
 export type XAISearchConfig = NonNullable<ProviderOptionsMap['xai']['searchParameters']>
 
-
 /**
  * 插件初始化时接收的完整配置对象
  *

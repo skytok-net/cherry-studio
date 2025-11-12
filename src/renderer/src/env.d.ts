@@ -2,9 +2,9 @@
 
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
 import type KeyvStorage from '@kangfenmao/keyv-storage'
+import type { NetworkApi } from '@preload/networkApi'
 import type { HookAPI } from 'antd/es/modal/useModal'
 import type { NavigateFunction } from 'react-router-dom'
-import type { NetworkApi } from '@preload/networkApi'
 
 import type {
   addToast,

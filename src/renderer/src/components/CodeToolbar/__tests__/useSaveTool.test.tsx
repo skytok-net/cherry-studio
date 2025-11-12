@@ -117,9 +117,9 @@ describe('useSaveTool', () => {
   describe('save functionality', () => {
     it('should execute save behavior when tool is clicked', () => {
       const mockSave = vi.fn()
-      const mockEditorHandles = { save: mockSave }
+      const mockEditorHandles = { save: mockSave, getValue: vi.fn(() => '') }
       const props = createMockProps({
-        sourceViewRef: { current: mockEditorHandles }
+        sourceViewRef: { current: mockEditorHandles as any }
       })
       renderHook(() => useSaveTool(props))
 
@@ -151,7 +151,7 @@ describe('useSaveTool', () => {
 
     it('should handle when sourceViewRef.current.save is undefined', () => {
       const props = createMockProps({
-        sourceViewRef: { current: {} }
+        sourceViewRef: { current: { getValue: vi.fn(() => '') } as any }
       })
       renderHook(() => useSaveTool(props))
 

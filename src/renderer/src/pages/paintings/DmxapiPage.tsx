@@ -11,7 +11,7 @@ import { useRuntime } from '@renderer/hooks/useRuntime'
 import FileManager from '@renderer/services/FileManager'
 import { useAppDispatch } from '@renderer/store'
 import { setGenerating } from '@renderer/store/runtime'
-import type { FileMetadata } from '@renderer/types'
+import type { FileMetadata, PaintingAction } from '@renderer/types'
 import { convertToBase64, uuid } from '@renderer/utils'
 import type { DmxapiPainting } from '@types'
 import { Avatar, Button, Input, InputNumber, Segmented, Select, Switch, Tooltip } from 'antd'
@@ -602,13 +602,14 @@ const DmxapiPage: FC<{ Options: string[] }> = ({ Options }) => {
     setCurrentImageIndex((prev) => (prev - 1 + painting.files.length) % painting.files.length)
   }
 
-  const onDeletePainting = async (paintingToDelete: DmxapiPainting) => {
-    if (paintingToDelete.id === painting.id) {
+  const onDeletePainting = async (paintingToDelete: PaintingAction) => {
+    const dmxapiPainting = paintingToDelete as DmxapiPainting
+    if (dmxapiPainting.id === painting.id) {
       if (isLoading) {
         return
       }
 
-      const currentIndex = dmxapi_paintings.findIndex((p) => p.id === paintingToDelete.id)
+      const currentIndex = dmxapi_paintings.findIndex((p) => p.id === dmxapiPainting.id)
 
       if (currentIndex > 0) {
         setPainting(dmxapi_paintings[currentIndex - 1])
@@ -629,10 +630,10 @@ const DmxapiPage: FC<{ Options: string[] }> = ({ Options }) => {
     }
   }
 
-  const onSelectPainting = (newPainting: DmxapiPainting) => {
+  const onSelectPainting = (newPainting: PaintingAction) => {
     if (generating) return
     clearImages()
-    setPainting(newPainting)
+    setPainting(newPainting as DmxapiPainting)
     setCurrentImageIndex(0)
   }
 

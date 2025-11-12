@@ -11,14 +11,7 @@
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
-export type RequestStatus =
-  | 'pending'
-  | 'validating'
-  | 'approved'
-  | 'executing'
-  | 'completed'
-  | 'failed'
-  | 'cached'
+export type RequestStatus = 'pending' | 'validating' | 'approved' | 'executing' | 'completed' | 'failed' | 'cached'
 
 export type ReputationLevel = 'trusted' | 'unknown' | 'suspicious' | 'blocked'
 
@@ -260,7 +253,7 @@ export const NetworkErrorCodes = {
   PROXY_SERVICE_UNAVAILABLE: 'ERR_PROXY_SERVICE_UNAVAILABLE'
 } as const
 
-export type NetworkErrorCode = typeof NetworkErrorCodes[keyof typeof NetworkErrorCodes]
+export type NetworkErrorCode = (typeof NetworkErrorCodes)[keyof typeof NetworkErrorCodes]
 
 // ============================================================================
 // Default Values
@@ -295,7 +288,7 @@ export const SUPPORTED_PROTOCOLS = ['http:', 'https:'] as const
 export const BLOCKED_PORTS = [22, 23, 25, 53, 135, 139, 445, 1433, 1521, 3306, 3389, 5432] as const
 export const DEFAULT_HEADERS = {
   'User-Agent': 'Cherry-Studio-Artifact/1.0',
-  'Accept': 'application/json, text/plain, */*',
+  Accept: 'application/json, text/plain, */*',
   'Accept-Language': 'en-US,en;q=0.9'
 } as const
 
@@ -324,7 +317,9 @@ export function isValidReputationLevel(level: string): level is ReputationLevel 
 }
 
 export function isValidSecurityViolationType(type: string): type is SecurityViolationType {
-  return ['private_network', 'malicious_domain', 'rate_limit_exceeded', 'invalid_protocol', 'blocked_port'].includes(type)
+  return ['private_network', 'malicious_domain', 'rate_limit_exceeded', 'invalid_protocol', 'blocked_port'].includes(
+    type
+  )
 }
 
 // ============================================================================
@@ -366,7 +361,7 @@ export function isPrivateNetwork(url: string): boolean {
       return true
     }
 
-    return privateRanges.some(range => range.test(hostname))
+    return privateRanges.some((range) => range.test(hostname))
   } catch {
     return false
   }

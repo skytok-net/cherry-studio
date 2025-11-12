@@ -25,7 +25,7 @@ import FileManager from '@renderer/services/FileManager'
 import { translateText } from '@renderer/services/TranslateService'
 import { useAppDispatch } from '@renderer/store'
 import { setGenerating } from '@renderer/store/runtime'
-import type { PaintingAction, PaintingsState } from '@renderer/types'
+import type { Painting, PaintingAction, PaintingsState } from '@renderer/types'
 import type { FileMetadata } from '@renderer/types'
 import { getErrorMessage, uuid } from '@renderer/utils'
 import { Avatar, Button, Empty, InputNumber, Segmented, Select, Upload } from 'antd'
@@ -82,7 +82,11 @@ const NewApiPage: FC<{ Options: string[] }> = ({ Options }) => {
     () => (newApiPaintings[mode] || []).filter((p) => p.providerId === newApiProvider.id),
     [newApiPaintings, mode, newApiProvider.id]
   )
-  const [painting, setPainting] = useState<PaintingAction>({ ...DEFAULT_PAINTING, providerId: newApiProvider.id })
+  const [painting, setPainting] = useState<PaintingAction>({
+    ...DEFAULT_PAINTING,
+    providerId: newApiProvider.id,
+    seed: DEFAULT_PAINTING.seed !== undefined ? String(DEFAULT_PAINTING.seed) : undefined
+  })
 
   const modeOptions = [
     { label: t('paintings.mode.generate'), value: 'openai_image_generate' },
@@ -347,7 +351,7 @@ const NewApiPage: FC<{ Options: string[] }> = ({ Options }) => {
     }
   }
 
-  const handleRetry = async (painting: Painting) => {
+  const handleRetry = async (painting: PaintingAction | Painting) => {
     setIsLoading(true)
     try {
       const validFiles = await downloadImages(painting.urls)
@@ -373,20 +377,38 @@ const NewApiPage: FC<{ Options: string[] }> = ({ Options }) => {
   }
 
   const handleAddPainting = () => {
-    const newPainting = addPainting(mode, getNewPainting())
-    updatePainting(mode, newPainting)
-    setPainting(newPainting)
-    return newPainting
+    const newPainting = getNewPainting()
+    const paintingAction: PaintingAction = {
+      ...newPainting,
+      seed: newPainting.seed !== undefined ? String(newPainting.seed) : undefined
+    }
+    const addedPainting = addPainting(mode, paintingAction)
+    updatePainting(mode, paintingAction)
+    setPainting(paintingAction)
+    return addedPainting
   }
 
-  const onDeletePainting = (paintingToDelete: Painting) => {
+  const onDeletePainting = (paintingToDelete: PaintingAction) => {
     if (paintingToDelete.id === painting.id) {
       const currentIndex = filteredPaintings.findIndex((p) => p.id === paintingToDelete.id)
 
       if (currentIndex > 0) {
-        setPainting(filteredPaintings[currentIndex - 1])
+        // Convert Painting to PaintingAction (convert seed from number to string)
+        const paintingAction: PaintingAction = {
+          ...filteredPaintings[currentIndex - 1],
+          seed:
+            filteredPaintings[currentIndex - 1].seed !== undefined
+              ? String(filteredPaintings[currentIndex - 1].seed)
+              : undefined
+        }
+        setPainting(paintingAction)
       } else if (filteredPaintings.length > 1) {
-        setPainting(filteredPaintings[1])
+        // Convert Painting to PaintingAction (convert seed from number to string)
+        const paintingAction: PaintingAction = {
+          ...filteredPaintings[1],
+          seed: filteredPaintings[1].seed !== undefined ? String(filteredPaintings[1].seed) : undefined
+        }
+        setPainting(paintingAction)
       }
     }
 
@@ -446,11 +468,25 @@ const NewApiPage: FC<{ Options: string[] }> = ({ Options }) => {
     const list = (newApiPaintings[value as keyof PaintingsState] || []).filter(
       (p) => p.providerId === newApiProvider.id
     )
-    setPainting(list[0] || { ...DEFAULT_PAINTING, providerId: newApiProvider.id })
+    const defaultPainting: PaintingAction = {
+      ...DEFAULT_PAINTING,
+      providerId: newApiProvider.id,
+      seed: DEFAULT_PAINTING.seed !== undefined ? String(DEFAULT_PAINTING.seed) : undefined
+    }
+    if (list[0]) {
+      // Convert Painting to PaintingAction (convert seed from number to string)
+      const paintingAction: PaintingAction = {
+        ...list[0],
+        seed: list[0].seed !== undefined ? String(list[0].seed) : undefined
+      }
+      setPainting(paintingAction)
+    } else {
+      setPainting(defaultPainting)
+    }
   }
 
   // 渲染配置项的函数
-  const onSelectPainting = (newPainting: Painting) => {
+  const onSelectPainting = (newPainting: PaintingAction) => {
     if (generating) return
     setPainting(newPainting)
     setCurrentImageIndex(0)
@@ -469,15 +505,29 @@ const NewApiPage: FC<{ Options: string[] }> = ({ Options }) => {
   useEffect(() => {
     if (filteredPaintings.length === 0) {
       const newPainting = getNewPainting()
-      addPainting(mode, newPainting)
-      setPainting(newPainting)
+      const paintingAction: PaintingAction = {
+        ...newPainting,
+        seed: newPainting.seed !== undefined ? String(newPainting.seed) : undefined
+      }
+      addPainting(mode, paintingAction)
+      setPainting(paintingAction)
     } else {
       // 如果当前 painting 存在于 filteredPaintings 中，则优先显示当前 painting
       const found = filteredPaintings.find((p) => p.id === painting.id)
       if (found) {
-        setPainting(found)
-      } else {
-        setPainting(filteredPaintings[0])
+        // Convert Painting to PaintingAction (convert seed from number to string)
+        const paintingAction: PaintingAction = {
+          ...found,
+          seed: found.seed !== undefined ? String(found.seed) : undefined
+        }
+        setPainting(paintingAction)
+      } else if (filteredPaintings[0]) {
+        // Convert Painting to PaintingAction (convert seed from number to string)
+        const paintingAction: PaintingAction = {
+          ...filteredPaintings[0],
+          seed: filteredPaintings[0].seed !== undefined ? String(filteredPaintings[0].seed) : undefined
+        }
+        setPainting(paintingAction)
       }
     }
   }, [filteredPaintings, mode, addPainting, getNewPainting, painting.id])

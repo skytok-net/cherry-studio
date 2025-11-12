@@ -6,11 +6,7 @@
  * storage options for optimal performance and data persistence.
  */
 
-import type {
-  NetworkRequest,
-  NetworkResponse,
-  NetworkSettings
-} from '../../types/networkTypes'
+import type { NetworkRequest, NetworkResponse, NetworkSettings } from '../../types/networkTypes'
 
 // ============================================================================
 // Cache Interfaces
@@ -153,11 +149,7 @@ export class RequestCache {
   /**
    * Store response in cache
    */
-  async set(
-    request: NetworkRequest,
-    response: NetworkResponse,
-    options: CacheOptions = {}
-  ): Promise<boolean> {
+  async set(request: NetworkRequest, response: NetworkResponse, options: CacheOptions = {}): Promise<boolean> {
     try {
       // Check if response is cacheable
       if (!this.isCacheable(request, response)) {
@@ -377,7 +369,7 @@ export class RequestCache {
     let hash = 0
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i)
-      hash = ((hash << 5) - hash) + char
+      hash = (hash << 5) - hash + char
       hash = hash & hash // Convert to 32-bit integer
     }
     return `cache_${Math.abs(hash).toString(36)}`
@@ -416,14 +408,9 @@ export class RequestCache {
     // Only compress text-based content above threshold
     if (size < this.config.compressionThreshold) return false
 
-    const compressibleTypes = [
-      'text/',
-      'application/json',
-      'application/javascript',
-      'application/xml'
-    ]
+    const compressibleTypes = ['text/', 'application/json', 'application/javascript', 'application/xml']
 
-    return compressibleTypes.some(type => contentType.includes(type))
+    return compressibleTypes.some((type) => contentType.includes(type))
   }
 
   private async compressResponse(response: NetworkResponse): Promise<{
@@ -461,7 +448,7 @@ export class RequestCache {
   private async exceedsSizeLimit(entry: CacheEntry): Promise<boolean> {
     const currentSize = await this.calculateTotalSize()
     const entrySize = this.estimateEntrySize(entry)
-    return (currentSize + entrySize) > this.config.maxTotalSize
+    return currentSize + entrySize > this.config.maxTotalSize
   }
 
   private async evictEntries(): Promise<void> {
@@ -490,7 +477,7 @@ export class RequestCache {
       const success = await this.storage.delete(key)
       if (success) {
         this.stats.evictionCount++
-        currentSize -= this.estimateEntrySize(entries.find(e => e.key === key)!.entry)
+        currentSize -= this.estimateEntrySize(entries.find((e) => e.key === key)!.entry)
       }
     }
   }
@@ -508,7 +495,7 @@ export class RequestCache {
     const sizeScore = this.estimateEntrySize(entry) / 1024 // KB
     const stalenessScore = timeSinceAccess / (1000 * 60 * 60) // Hours since last access
 
-    return (ageScore * 0.3) + (accessScore * 0.4) + (sizeScore * 0.1) + (stalenessScore * 0.2)
+    return ageScore * 0.3 + accessScore * 0.4 + sizeScore * 0.1 + stalenessScore * 0.2
   }
 
   private estimateEntrySize(entry: CacheEntry): number {
@@ -530,7 +517,7 @@ export class RequestCache {
       if (!query.includeExpired && this.isExpired(entry)) continue
 
       // Check tags
-      if (query.tags && (!entry.tags || !query.tags.some(tag => entry.tags!.has(tag)))) {
+      if (query.tags && (!entry.tags || !query.tags.some((tag) => entry.tags!.has(tag)))) {
         continue
       }
 
@@ -550,7 +537,7 @@ export class RequestCache {
       }
 
       // Check max age
-      if (query.maxAge && (Date.now() - entry.createdAt) > query.maxAge) {
+      if (query.maxAge && Date.now() - entry.createdAt > query.maxAge) {
         continue
       }
 

@@ -405,7 +405,14 @@ export interface FalAIPainting extends PaintingParams {
 }
 
 export type PaintingAction = Partial<
-  GeneratePainting & RemixPainting & EditPainting & ScalePainting & DmxapiPainting & TokenFluxPainting & OvmsPainting & FalAIPainting
+  GeneratePainting &
+    RemixPainting &
+    EditPainting &
+    ScalePainting &
+    DmxapiPainting &
+    TokenFluxPainting &
+    OvmsPainting &
+    FalAIPainting
 > &
   PaintingParams
 

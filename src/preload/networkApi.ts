@@ -7,11 +7,12 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron'
+
 import type {
+  DomainReputation,
   NetworkRequest,
   NetworkResponse,
   NetworkSettings,
-  DomainReputation,
   NetworkStats,
   SecurityViolation
 } from '../main/types/networkTypes'
@@ -49,7 +50,10 @@ export interface NetworkApi {
   /**
    * Override security policy for current session
    */
-  overrideBlock: (domain: string, reason: string) => Promise<{
+  overrideBlock: (
+    domain: string,
+    reason: string
+  ) => Promise<{
     success: boolean
     expiresAt: number
   }>
@@ -67,26 +71,23 @@ export interface NetworkApi {
   /**
    * Event listeners for network events
    */
-  onRequestUpdate: (callback: (data: {
-    requestId: string
-    status: 'pending' | 'validating' | 'executing' | 'completed' | 'failed' | 'cached'
-    progress?: number
-  }) => void) => () => void
+  onRequestUpdate: (
+    callback: (data: {
+      requestId: string
+      status: 'pending' | 'validating' | 'executing' | 'completed' | 'failed' | 'cached'
+      progress?: number
+    }) => void
+  ) => () => void
 
   onSecurityViolation: (callback: (violation: SecurityViolation) => void) => () => void
 
   onSettingsChanged: (callback: (settings: NetworkSettings) => void) => () => void
 
-  onRateLimitWarning: (callback: (data: {
-    artifactId: string
-    remaining: number
-    resetTime: number
-  }) => void) => () => void
+  onRateLimitWarning: (
+    callback: (data: { artifactId: string; remaining: number; resetTime: number }) => void
+  ) => () => void
 
-  onConnectionStatusChanged: (callback: (data: {
-    online: boolean
-    lastChecked: number
-  }) => void) => () => void
+  onConnectionStatusChanged: (callback: (data: { online: boolean; lastChecked: number }) => void) => () => void
 }
 
 // ============================================================================
@@ -166,11 +167,9 @@ const networkApi: NetworkApi = {
     return ipcRenderer.invoke('network:checkDomain', domain)
   },
 
-  getSettings: () =>
-    ipcRenderer.invoke('network:getSettings'),
+  getSettings: () => ipcRenderer.invoke('network:getSettings'),
 
-  updateSettings: (settings: Partial<NetworkSettings>) =>
-    ipcRenderer.invoke('network:updateSettings', settings),
+  updateSettings: (settings: Partial<NetworkSettings>) => ipcRenderer.invoke('network:updateSettings', settings),
 
   overrideBlock: (domain: string, reason: string) => {
     validateDomain(domain)
@@ -187,16 +186,18 @@ const networkApi: NetworkApi = {
     return ipcRenderer.invoke('network:clearCache', domain)
   },
 
-  getStats: () =>
-    ipcRenderer.invoke('network:getStats'),
+  getStats: () => ipcRenderer.invoke('network:getStats'),
 
   // Event listeners with cleanup functions
   onRequestUpdate: (callback) => {
-    const handler = (_event: any, data: {
-      requestId: string
-      status: 'pending' | 'validating' | 'executing' | 'completed' | 'failed' | 'cached'
-      progress?: number
-    }) => callback(data)
+    const handler = (
+      _event: any,
+      data: {
+        requestId: string
+        status: 'pending' | 'validating' | 'executing' | 'completed' | 'failed' | 'cached'
+        progress?: number
+      }
+    ) => callback(data)
     ipcRenderer.on('network:requestUpdate', handler)
     return () => ipcRenderer.removeListener('network:requestUpdate', handler)
   },
@@ -214,20 +215,26 @@ const networkApi: NetworkApi = {
   },
 
   onRateLimitWarning: (callback) => {
-    const handler = (_event: any, data: {
-      artifactId: string
-      remaining: number
-      resetTime: number
-    }) => callback(data)
+    const handler = (
+      _event: any,
+      data: {
+        artifactId: string
+        remaining: number
+        resetTime: number
+      }
+    ) => callback(data)
     ipcRenderer.on('network:rateLimitWarning', handler)
     return () => ipcRenderer.removeListener('network:rateLimitWarning', handler)
   },
 
   onConnectionStatusChanged: (callback) => {
-    const handler = (_event: any, data: {
-      online: boolean
-      lastChecked: number
-    }) => callback(data)
+    const handler = (
+      _event: any,
+      data: {
+        online: boolean
+        lastChecked: number
+      }
+    ) => callback(data)
     ipcRenderer.on('network:connectionStatusChanged', handler)
     return () => ipcRenderer.removeListener('network:connectionStatusChanged', handler)
   }

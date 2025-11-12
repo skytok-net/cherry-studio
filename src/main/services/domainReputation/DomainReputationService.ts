@@ -6,10 +6,7 @@
  * providers and maintains local reputation cache.
  */
 
-import type {
-  DomainReputation,
-  ReputationLevel
-} from '../../types/networkTypes'
+import type { DomainReputation, ReputationLevel } from '../../types/networkTypes'
 
 // ============================================================================
 // Core Interfaces
@@ -198,12 +195,10 @@ export class DomainReputationService {
 
     return {
       totalEntries: entries.length,
-      validEntries: entries.filter(e => e.expiresAt > now).length,
-      expiredEntries: entries.filter(e => e.expiresAt <= now).length,
+      validEntries: entries.filter((e) => e.expiresAt > now).length,
+      expiredEntries: entries.filter((e) => e.expiresAt <= now).length,
       totalHits: entries.reduce((sum, e) => sum + e.hits, 0),
-      averageAge: entries.length > 0
-        ? entries.reduce((sum, e) => sum + (now - e.createdAt), 0) / entries.length
-        : 0,
+      averageAge: entries.length > 0 ? entries.reduce((sum, e) => sum + (now - e.createdAt), 0) / entries.length : 0,
       cacheSize: this.estimateCacheSize()
     }
   }
@@ -233,23 +228,17 @@ export class DomainReputationService {
     // For now, we'll create placeholder implementations
 
     if (this.config.providers.safeBrowsing?.enabled) {
-      const safeBrowsingProvider = new SafeBrowsingProvider(
-        this.config.providers.safeBrowsing
-      )
+      const safeBrowsingProvider = new SafeBrowsingProvider(this.config.providers.safeBrowsing)
       this.registerProvider(safeBrowsingProvider)
     }
 
     if (this.config.providers.virusTotal?.enabled) {
-      const virusTotalProvider = new VirusTotalProvider(
-        this.config.providers.virusTotal
-      )
+      const virusTotalProvider = new VirusTotalProvider(this.config.providers.virusTotal)
       this.registerProvider(virusTotalProvider)
     }
 
     if (this.config.providers.local?.enabled) {
-      const localProvider = new LocalReputationProvider(
-        this.config.providers.local
-      )
+      const localProvider = new LocalReputationProvider(this.config.providers.local)
       this.registerProvider(localProvider)
     }
   }
@@ -260,10 +249,7 @@ export class DomainReputationService {
       providers.map(async (provider) => {
         try {
           const timeoutMs = provider.getConfig().cacheTimeout ?? this.config.cacheTimeoutMs
-          const result = await Promise.race([
-            provider.checkDomain(query.domain),
-            this.createTimeoutPromise(timeoutMs)
-          ])
+          const result = await Promise.race([provider.checkDomain(query.domain), this.createTimeoutPromise(timeoutMs)])
           return result
         } catch (error) {
           // Log error but don't fail the entire operation
@@ -274,10 +260,11 @@ export class DomainReputationService {
     )
 
     return results
-      .filter((result): result is PromiseFulfilledResult<ProviderResult> =>
-        result.status === 'fulfilled' && result.value !== null
+      .filter(
+        (result): result is PromiseFulfilledResult<ProviderResult> =>
+          result.status === 'fulfilled' && result.value !== null
       )
-      .map(result => result.value)
+      .map((result) => result.value)
   }
 
   private aggregateResults(domain: string, results: ProviderResult[]): DomainReputation {
@@ -301,7 +288,7 @@ export class DomainReputationService {
     }
 
     // Aggregate threat levels using weighted scoring
-    const scores = results.map(result => ({
+    const scores = results.map((result) => ({
       level: result.level,
       confidence: result.confidence,
       weight: this.getProviderWeight(result.provider)
@@ -314,9 +301,9 @@ export class DomainReputationService {
     const allCategories = new Set<string>()
     const allThreats = new Map<string, ThreatInfo>()
 
-    results.forEach(result => {
-      result.categories.forEach(cat => allCategories.add(cat))
-      result.threats.forEach(threat => {
+    results.forEach((result) => {
+      result.categories.forEach((cat) => allCategories.add(cat))
+      result.threats.forEach((threat) => {
         const key = `${threat.type}-${threat.description}`
         if (!allThreats.has(key) || threat.severity === 'critical') {
           allThreats.set(key, threat)
@@ -329,16 +316,20 @@ export class DomainReputationService {
       level: overallLevel,
       confidence: overallConfidence,
       lastChecked: Date.now(),
-      sources: results.map(r => r.provider),
+      sources: results.map((r) => r.provider),
       metadata: {
         categories: Array.from(allCategories),
         threatIntelligence: {
-          malwareCount: Array.from(allThreats.values()).filter(t => t.type === 'malware').length,
-          phishingCount: Array.from(allThreats.values()).filter(t => t.type === 'phishing').length,
-          spamCount: Array.from(allThreats.values()).filter(t => t.type === 'spam').length,
-          lastThreatDetected: Math.max(...Array.from(allThreats.values())
-            .filter(t => t.lastSeen)
-            .map(t => t.lastSeen!), 0) || undefined
+          malwareCount: Array.from(allThreats.values()).filter((t) => t.type === 'malware').length,
+          phishingCount: Array.from(allThreats.values()).filter((t) => t.type === 'phishing').length,
+          spamCount: Array.from(allThreats.values()).filter((t) => t.type === 'spam').length,
+          lastThreatDetected:
+            Math.max(
+              ...Array.from(allThreats.values())
+                .filter((t) => t.lastSeen)
+                .map((t) => t.lastSeen!),
+              0
+            ) || undefined
         },
         historicalData: {
           firstSeen: Date.now(),
@@ -350,19 +341,21 @@ export class DomainReputationService {
     }
   }
 
-  private calculateOverallLevel(scores: Array<{level: ReputationLevel, confidence: number, weight: number}>): ReputationLevel {
+  private calculateOverallLevel(
+    scores: Array<{ level: ReputationLevel; confidence: number; weight: number }>
+  ): ReputationLevel {
     // Weight the scores and determine overall threat level
     let weightedScore = 0
     let totalWeight = 0
 
     const levelScores = {
-      'trusted': 1,
-      'unknown': 2,
-      'suspicious': 3,
-      'blocked': 4
+      trusted: 1,
+      unknown: 2,
+      suspicious: 3,
+      blocked: 4
     }
 
-    scores.forEach(score => {
+    scores.forEach((score) => {
       const levelScore = levelScores[score.level]
       const effectiveWeight = score.weight * (score.confidence / 100)
       weightedScore += levelScore * effectiveWeight
@@ -379,12 +372,12 @@ export class DomainReputationService {
     return 'blocked'
   }
 
-  private calculateOverallConfidence(scores: Array<{level: ReputationLevel, confidence: number, weight: number}>): number {
+  private calculateOverallConfidence(
+    scores: Array<{ level: ReputationLevel; confidence: number; weight: number }>
+  ): number {
     if (scores.length === 0) return 0
 
-    const weightedConfidence = scores.reduce((sum, score) =>
-      sum + (score.confidence * score.weight), 0
-    )
+    const weightedConfidence = scores.reduce((sum, score) => sum + score.confidence * score.weight, 0)
     const totalWeight = scores.reduce((sum, score) => sum + score.weight, 0)
 
     return totalWeight > 0 ? Math.round(weightedConfidence / totalWeight) : 0
@@ -397,11 +390,11 @@ export class DomainReputationService {
 
   private getActiveProviders(requestedProviders?: string[]): ReputationProvider[] {
     const providers = Array.from(this.providers.values())
-      .filter(p => p.enabled)
+      .filter((p) => p.enabled)
       .sort((a, b) => b.priority - a.priority)
 
     if (requestedProviders) {
-      return providers.filter(p => requestedProviders.includes(p.name))
+      return providers.filter((p) => requestedProviders.includes(p.name))
     }
 
     return providers
@@ -420,7 +413,7 @@ export class DomainReputationService {
     }
 
     // Check max age if specified
-    if (maxAge && (now - entry.createdAt) > maxAge) {
+    if (maxAge && now - entry.createdAt > maxAge) {
       return null
     }
 
@@ -456,7 +449,7 @@ export class DomainReputationService {
         }
       })
 
-      expiredEntries.forEach(domain => this.cache.delete(domain))
+      expiredEntries.forEach((domain) => this.cache.delete(domain))
     }, this.config.cacheCleanupIntervalMs)
   }
 

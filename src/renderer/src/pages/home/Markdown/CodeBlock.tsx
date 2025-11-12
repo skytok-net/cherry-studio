@@ -51,7 +51,14 @@ const CodeBlock: React.FC<Props> = ({ children, className, node, blockId }) => {
       }
       if (language === 'tsx' || language === 'jsx') {
         const isOpenFence = isOpenFenceBlock(children?.length, languageMatch?.[1]?.length, node?.position)
-        return <TsxArtifactsCard tsx={children} onSave={handleSave} isStreaming={isStreaming && isOpenFence} blockId={blockId} />
+        return (
+          <TsxArtifactsCard
+            tsx={children}
+            onSave={handleSave}
+            isStreaming={isStreaming && isOpenFence}
+            blockId={blockId}
+          />
+        )
       }
     }
 

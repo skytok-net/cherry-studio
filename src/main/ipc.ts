@@ -37,6 +37,7 @@ import BackupManager from './services/BackupManager'
 import { codeToolsService } from './services/CodeToolsService'
 import { configManager } from './services/ConfigManager'
 import CopilotService from './services/CopilotService'
+import { createDomainReputationService } from './services/domainReputation/DomainReputationService'
 import DxtService from './services/DxtService'
 import { ExportService } from './services/ExportService'
 import { fileStorage as fileManager } from './services/FileStorage'
@@ -44,6 +45,8 @@ import FileService from './services/FileSystemService'
 import KnowledgeService from './services/KnowledgeService'
 import mcpService from './services/MCPService'
 import MemoryService from './services/memory/MemoryService'
+import { NetworkIpcHandlers } from './services/networkProxy/NetworkIpcHandlers'
+import { createNetworkProxyService } from './services/networkProxy/NetworkProxyService'
 import { openTraceWindow, setTraceWindowTitle } from './services/NodeTraceService'
 import NotificationService from './services/NotificationService'
 import * as NutstoreService from './services/NutstoreService'
@@ -54,7 +57,9 @@ import powerMonitorService from './services/PowerMonitorService'
 import { proxyManager } from './services/ProxyManager'
 import { pythonService } from './services/PythonService'
 import { FileServiceManager } from './services/remotefile/FileServiceManager'
+import { createRequestCacheFromSettings } from './services/requestCache/RequestCache'
 import { searchService } from './services/SearchService'
+import { createSecurityPolicy } from './services/securityPolicy/SecurityPolicy'
 import { SelectionService } from './services/SelectionService'
 import { registerShortcuts, unregisterAllShortcuts } from './services/ShortcutService'
 import {
@@ -76,13 +81,8 @@ import VertexAIService from './services/VertexAIService'
 import WebSocketService from './services/WebSocketService'
 import { setOpenLinkExternal } from './services/WebviewService'
 import { windowService } from './services/WindowService'
-import { calculateDirectorySize, getResourcePath } from './utils'
-import { NetworkIpcHandlers } from './services/networkProxy/NetworkIpcHandlers'
-import { createNetworkProxyService } from './services/networkProxy/NetworkProxyService'
-import { createSecurityPolicy } from './services/securityPolicy/SecurityPolicy'
-import { createDomainReputationService } from './services/domainReputation/DomainReputationService'
-import { createRequestCacheFromSettings } from './services/requestCache/RequestCache'
 import { DEFAULT_NETWORK_SETTINGS } from './types/networkTypes'
+import { calculateDirectorySize, getResourcePath } from './utils'
 import { decrypt, encrypt } from './utils/aes'
 import {
   getCacheDir,
@@ -133,11 +133,7 @@ export function registerIpc(mainWindow: BrowserWindow, app: Electron.App) {
     providers: {}
   })
   const requestCache = createRequestCacheFromSettings(networkSettings)
-  const networkProxyService = createNetworkProxyService(
-    securityPolicy,
-    domainReputationService,
-    requestCache
-  )
+  const networkProxyService = createNetworkProxyService(securityPolicy, domainReputationService, requestCache)
   const networkIpcHandlers = new NetworkIpcHandlers(networkProxyService, securityPolicy, networkSettings)
 
   // Register shutdown handlers
