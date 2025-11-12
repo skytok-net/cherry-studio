@@ -371,5 +371,22 @@ export enum IpcChannel {
   WebSocket_Stop = 'webSocket:stop',
   WebSocket_Status = 'webSocket:status',
   WebSocket_SendFile = 'webSocket:send-file',
-  WebSocket_GetAllCandidates = 'webSocket:get-all-candidates'
+  WebSocket_GetAllCandidates = 'webSocket:get-all-candidates',
+
+  // Network API for TSX Artifacts
+  Network_Request = 'network:request',
+  Network_CancelRequest = 'network:cancelRequest',
+  Network_CheckDomain = 'network:checkDomain',
+  Network_GetSettings = 'network:getSettings',
+  Network_UpdateSettings = 'network:updateSettings',
+  Network_OverrideBlock = 'network:overrideBlock',
+  Network_ClearCache = 'network:clearCache',
+  Network_GetStats = 'network:getStats',
+
+  // Network Events
+  Network_RequestUpdate = 'network:requestUpdate',
+  Network_SecurityViolation = 'network:securityViolation',
+  Network_SettingsChanged = 'network:settingsChanged',
+  Network_RateLimitWarning = 'network:rateLimitWarning',
+  Network_ConnectionStatusChanged = 'network:connectionStatusChanged'
 }

@@ -405,7 +405,7 @@ export const DEFAULT_PAINTING: PaintingAction = {
   prompt: '',
   negativePrompt: '',
   magicPromptOption: true,
-  seed: '',
+  seed: undefined,
   imageWeight: 50,
   resemblance: 50,
   detail: 50,

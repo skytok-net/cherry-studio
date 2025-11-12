@@ -4,6 +4,7 @@ import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk'
 import type KeyvStorage from '@kangfenmao/keyv-storage'
 import type { HookAPI } from 'antd/es/modal/useModal'
 import type { NavigateFunction } from 'react-router-dom'
+import type { NetworkApi } from '@preload/networkApi'
 
 import type {
   addToast,
@@ -45,6 +46,7 @@ declare global {
       info: typeof info
       loading: typeof loading
     }
+    networkApi: NetworkApi
     agentTools: {
       respondToPermission: (payload: {
         requestId: string

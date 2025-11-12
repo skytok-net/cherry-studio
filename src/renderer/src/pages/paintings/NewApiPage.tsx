@@ -347,7 +347,7 @@ const NewApiPage: FC<{ Options: string[] }> = ({ Options }) => {
     }
   }
 
-  const handleRetry = async (painting: PaintingAction) => {
+  const handleRetry = async (painting: Painting) => {
     setIsLoading(true)
     try {
       const validFiles = await downloadImages(painting.urls)
@@ -379,7 +379,7 @@ const NewApiPage: FC<{ Options: string[] }> = ({ Options }) => {
     return newPainting
   }
 
-  const onDeletePainting = (paintingToDelete: PaintingAction) => {
+  const onDeletePainting = (paintingToDelete: Painting) => {
     if (paintingToDelete.id === painting.id) {
       const currentIndex = filteredPaintings.findIndex((p) => p.id === paintingToDelete.id)
 
@@ -450,7 +450,7 @@ const NewApiPage: FC<{ Options: string[] }> = ({ Options }) => {
   }
 
   // 渲染配置项的函数
-  const onSelectPainting = (newPainting: PaintingAction) => {
+  const onSelectPainting = (newPainting: Painting) => {
     if (generating) return
     setPainting(newPainting)
     setCurrentImageIndex(0)

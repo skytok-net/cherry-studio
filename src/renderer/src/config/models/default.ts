@@ -28,6 +28,8 @@ export const SYSTEM_MODELS: Record<SystemProviderId | 'defaultModel', Model[]> =
   cherryin: [],
   vertexai: [],
   sophnet: [],
+  falai: [],
+  'fal-ai': [],
   '302ai': [
     {
       id: 'deepseek-chat',

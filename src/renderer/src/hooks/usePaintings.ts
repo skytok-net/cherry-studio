@@ -15,6 +15,7 @@ export function usePaintings() {
   const openai_image_generate = useAppSelector((state) => state.paintings.openai_image_generate)
   const openai_image_edit = useAppSelector((state) => state.paintings.openai_image_edit)
   const ovms_paintings = useAppSelector((state) => state.paintings.ovms_paintings)
+  const falai_paintings = useAppSelector((state) => state.paintings.falai_paintings)
   const dispatch = useAppDispatch()
 
   return {
@@ -29,6 +30,7 @@ export function usePaintings() {
     openai_image_generate,
     openai_image_edit,
     ovms_paintings,
+    falai_paintings,
     addPainting: (namespace: keyof PaintingsState, painting: PaintingAction) => {
       dispatch(addPainting({ namespace, painting }))
       return painting

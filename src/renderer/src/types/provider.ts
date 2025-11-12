@@ -176,7 +176,9 @@ export const SystemProviderIds = {
   poe: 'poe',
   aionly: 'aionly',
   longcat: 'longcat',
-  huggingface: 'huggingface'
+  huggingface: 'huggingface',
+  falai: 'falai',
+  'fal-ai': 'fal-ai'
 } as const
 
 export type SystemProviderId = keyof typeof SystemProviderIds

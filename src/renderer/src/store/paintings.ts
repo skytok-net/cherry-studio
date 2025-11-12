@@ -22,7 +22,9 @@ const initialState: PaintingsState = {
   openai_image_generate: [],
   openai_image_edit: [],
   // OVMS
-  ovms_paintings: []
+  ovms_paintings: [],
+  // fal.ai
+  falai_paintings: []
 }
 
 const paintingsSlice = createSlice({

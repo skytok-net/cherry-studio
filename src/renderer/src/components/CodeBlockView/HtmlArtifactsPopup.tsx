@@ -1,3 +1,4 @@
+import { loggerService } from '@logger'
 import type { CodeEditorHandles } from '@renderer/components/CodeEditor'
 import CodeEditor from '@renderer/components/CodeEditor'
 import { CopyIcon, FilePngIcon } from '@renderer/components/Icons'
@@ -7,10 +8,12 @@ import { classNames } from '@renderer/utils'
 import { extractHtmlTitle, getFileNameFromHtmlTitle } from '@renderer/utils/formats'
 import { captureScrollableIframeAsBlob, captureScrollableIframeAsDataURL } from '@renderer/utils/image'
 import { Button, Dropdown, Modal, Splitter, Tooltip, Typography } from 'antd'
-import { Camera, Check, Code, Eye, Maximize2, Minimize2, SaveIcon, SquareSplitHorizontal, X } from 'lucide-react'
+import { Camera, Check, Code, Copy, Eye, Maximize2, Minimize2, SaveIcon, SquareSplitHorizontal, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
+
+const logger = loggerService.withContext('HtmlArtifactsPopup')
 
 interface HtmlArtifactsPopupProps {
   open: boolean
@@ -27,8 +30,174 @@ const HtmlArtifactsPopup: React.FC<HtmlArtifactsPopupProps> = ({ open, title, ht
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [saved, setSaved] = useTemporaryValue(false, 2000)
+  const [copied, setCopied] = useTemporaryValue(false, 2000)
   const codeEditorRef = useRef<CodeEditorHandles>(null)
   const previewFrameRef = useRef<HTMLIFrameElement>(null)
+
+  // Create network-enabled HTML with API injection
+  const createNetworkEnabledHtml = useCallback((originalHtml: string) => {
+    // If HTML is empty or only whitespace, return it as-is
+    if (!originalHtml || !originalHtml.trim()) {
+      return originalHtml
+    }
+
+    // Check if HTML already has a DOCTYPE and html structure
+    const hasDoctype = originalHtml.toLowerCase().includes('<!doctype')
+    const hasHtmlTag = originalHtml.toLowerCase().includes('<html')
+
+    if (hasDoctype && hasHtmlTag) {
+      // HTML is complete, inject script before closing head or body tag
+      let enhancedHtml = originalHtml
+
+      const networkApiScript = `
+        <script>
+          // Network API injection for HTML artifacts
+          (function() {
+            try {
+              // Check if we're in an iframe with access to parent window
+              if (window.parent && window.parent !== window && window.parent.networkApi) {
+                // Inject network API from parent window
+                window.networkApi = window.parent.networkApi;
+
+                console.log('Network API successfully injected into HTML artifact');
+
+                // Dispatch ready event
+                window.dispatchEvent(new CustomEvent('networkApiReady', {
+                  detail: { available: true, source: 'parent' }
+                }));
+              } else {
+                console.warn('Network API not available - parent window access restricted');
+
+                // Provide fallback API that shows helpful errors
+                window.networkApi = {
+                  makeRequest: () => Promise.reject(new Error('Network API not available in this context')),
+                  cancelRequest: () => Promise.resolve(false),
+                  checkDomain: () => Promise.reject(new Error('Network API not available in this context')),
+                  getSettings: () => Promise.reject(new Error('Network API not available in this context')),
+                  updateSettings: () => Promise.reject(new Error('Network API not available in this context')),
+                  overrideBlock: () => Promise.reject(new Error('Network API not available in this context')),
+                  clearCache: () => Promise.reject(new Error('Network API not available in this context')),
+                  getStats: () => Promise.reject(new Error('Network API not available in this context'))
+                };
+
+                window.dispatchEvent(new CustomEvent('networkApiReady', {
+                  detail: { available: false, reason: 'parent_access_restricted' }
+                }));
+              }
+            } catch (error) {
+              console.error('Failed to inject network API:', error);
+
+              // Provide error fallback
+              window.networkApi = {
+                makeRequest: () => Promise.reject(error),
+                cancelRequest: () => Promise.resolve(false),
+                checkDomain: () => Promise.reject(error),
+                getSettings: () => Promise.reject(error),
+                updateSettings: () => Promise.reject(error),
+                overrideBlock: () => Promise.reject(error),
+                clearCache: () => Promise.reject(error),
+                getStats: () => Promise.reject(error)
+              };
+
+              window.dispatchEvent(new CustomEvent('networkApiReady', {
+                detail: { available: false, reason: 'injection_error', error: error.message }
+              }));
+            }
+          })();
+        </script>
+      `
+
+      // Try to inject before closing head tag first, then before closing body tag
+      if (enhancedHtml.toLowerCase().includes('</head>')) {
+        enhancedHtml = enhancedHtml.replace(/<\/head>/i, `${networkApiScript}</head>`)
+      } else if (enhancedHtml.toLowerCase().includes('</body>')) {
+        enhancedHtml = enhancedHtml.replace(/<\/body>/i, `${networkApiScript}</body>`)
+      } else {
+        // If no head or body tags, append at the end
+        enhancedHtml = enhancedHtml + networkApiScript
+      }
+
+      return enhancedHtml
+    } else {
+      // HTML fragment, wrap it in a complete structure with network API
+      return `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>HTML Artifact</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 16px;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+              line-height: 1.5;
+            }
+          </style>
+          <script>
+            // Network API injection for HTML artifacts
+            (function() {
+              try {
+                // Check if we're in an iframe with access to parent window
+                if (window.parent && window.parent !== window && window.parent.networkApi) {
+                  // Inject network API from parent window
+                  window.networkApi = window.parent.networkApi;
+
+                  console.log('Network API successfully injected into HTML artifact');
+
+                  // Dispatch ready event
+                  window.dispatchEvent(new CustomEvent('networkApiReady', {
+                    detail: { available: true, source: 'parent' }
+                  }));
+                } else {
+                  console.warn('Network API not available - parent window access restricted');
+
+                  // Provide fallback API that shows helpful errors
+                  window.networkApi = {
+                    makeRequest: () => Promise.reject(new Error('Network API not available in this context')),
+                    cancelRequest: () => Promise.resolve(false),
+                    checkDomain: () => Promise.reject(new Error('Network API not available in this context')),
+                    getSettings: () => Promise.reject(new Error('Network API not available in this context')),
+                    updateSettings: () => Promise.reject(new Error('Network API not available in this context')),
+                    overrideBlock: () => Promise.reject(new Error('Network API not available in this context')),
+                    clearCache: () => Promise.reject(new Error('Network API not available in this context')),
+                    getStats: () => Promise.reject(new Error('Network API not available in this context'))
+                  };
+
+                  window.dispatchEvent(new CustomEvent('networkApiReady', {
+                    detail: { available: false, reason: 'parent_access_restricted' }
+                  }));
+                }
+              } catch (error) {
+                console.error('Failed to inject network API:', error);
+
+                // Provide error fallback
+                window.networkApi = {
+                  makeRequest: () => Promise.reject(error),
+                  cancelRequest: () => Promise.resolve(false),
+                  checkDomain: () => Promise.reject(error),
+                  getSettings: () => Promise.reject(error),
+                  updateSettings: () => Promise.reject(error),
+                  overrideBlock: () => Promise.reject(error),
+                  clearCache: () => Promise.reject(error),
+                  getStats: () => Promise.reject(error)
+                };
+
+                window.dispatchEvent(new CustomEvent('networkApiReady', {
+                  detail: { available: false, reason: 'injection_error', error: error.message }
+                }));
+              }
+            })();
+          </script>
+        </head>
+        <body>
+          ${originalHtml}
+        </body>
+        </html>
+      `
+    }
+  }, [])
 
   // Prevent body scroll when fullscreen
   useEffect(() => {
@@ -46,6 +215,18 @@ const HtmlArtifactsPopup: React.FC<HtmlArtifactsPopupProps> = ({ open, title, ht
   const handleSave = () => {
     codeEditorRef.current?.save?.()
     setSaved(true)
+  }
+
+  const handleCopy = async () => {
+    try {
+      const codeToCopy = codeEditorRef.current?.getValue() || html
+      await navigator.clipboard.writeText(codeToCopy)
+      setCopied(true)
+      window.toast.success(t('message.copy.success'))
+    } catch (error) {
+      logger.error('Failed to copy code:', error as Error)
+      window.toast.error(t('message.copy.failed') || 'Failed to copy code')
+    }
   }
 
   const handleCapture = useCallback(
@@ -157,6 +338,20 @@ const HtmlArtifactsPopup: React.FC<HtmlArtifactsPopupProps> = ({ open, title, ht
           }}
         />
         <ToolbarWrapper>
+          <Tooltip title={t('code_block.edit.copy.label')} mouseLeaveDelay={0}>
+            <ToolbarButton
+              shape="circle"
+              size="large"
+              icon={
+                copied ? (
+                  <Check size={16} color="var(--color-status-success)" />
+                ) : (
+                  <Copy size={16} className="custom-lucide" />
+                )
+              }
+              onClick={handleCopy}
+            />
+          </Tooltip>
           <Tooltip title={t('code_block.edit.save.label')} mouseLeaveDelay={0}>
             <ToolbarButton
               shape="circle"
@@ -181,9 +376,9 @@ const HtmlArtifactsPopup: React.FC<HtmlArtifactsPopupProps> = ({ open, title, ht
           <PreviewFrame
             ref={previewFrameRef}
             key={html} // Force recreate iframe when preview content changes
-            srcDoc={html}
+            srcDoc={createNetworkEnabledHtml(html)}
             title="HTML Preview"
-            sandbox="allow-scripts allow-same-origin allow-forms"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox"
           />
         ) : (
           <EmptyPreview>
@@ -424,7 +619,7 @@ const ToolbarWrapper = styled.div`
   flex-direction: column;
   align-items: center;
   position: absolute;
-  gap: 4px;
+  gap: 8px;
   right: 1rem;
   bottom: 1rem;
   z-index: 1;

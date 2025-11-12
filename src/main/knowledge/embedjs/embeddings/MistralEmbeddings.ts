@@ -6,7 +6,7 @@ const logger = loggerService.withContext('MistralEmbeddings')
 
 interface MistralEmbeddingRequest {
   model: string
-  inputs: string[]
+  input: string[]
   output_dimension?: number
   output_dtype?: 'float' | 'int8' | 'binary' | 'uint8'
   encoding_format?: string
@@ -98,7 +98,7 @@ export class MistralEmbeddings extends BaseEmbeddings {
   private async createEmbeddings(inputs: string[]): Promise<number[][]> {
     const requestBody: MistralEmbeddingRequest = {
       model: this.config.model,
-      inputs: inputs
+      input: inputs
     }
 
     // Add optional parameters if configured
@@ -158,7 +158,7 @@ export class MistralEmbeddings extends BaseEmbeddings {
     logger.debug(`Mistral API request (attempt ${attempt}):`, {
       url,
       model: requestBody.model,
-      inputCount: requestBody.inputs.length
+      inputCount: requestBody.input.length
     })
 
     const controller = new AbortController()

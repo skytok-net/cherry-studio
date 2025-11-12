@@ -1046,6 +1046,9 @@
       "svg": "Download SVG"
     },
     "edit": {
+      "copy": {
+        "label": "Copy Code"
+      },
       "label": "Edit",
       "save": {
         "failed": {
@@ -1358,6 +1361,35 @@
     "generating": "Generating",
     "preview": "Preview",
     "split": "Split"
+  },
+  "tsx_artifacts": {
+    "capture": {
+      "label": "Capture Preview",
+      "to_clipboard": "Copy to Clipboard",
+      "to_file": "Save as Image"
+    },
+    "code": "Code",
+    "empty_preview": "No content to preview",
+    "error": {
+      "title": "Preview Error"
+    },
+    "fix": {
+      "button": "Fix Code",
+      "error": {
+        "no_context": "Unable to get message context",
+        "send_failed": "Failed to send fix request"
+      },
+      "requested": "Fix request sent to AI",
+      "requesting": "Requesting fix..."
+    },
+    "generating": "Generating component...",
+    "preview": "Preview",
+    "retry": {
+      "attempt": "Auto-retry attempt {{attempt}}/{{max}}",
+      "max_reached": "Maximum retry attempts reached. Please fix manually or request a fix."
+    },
+    "split": "Split",
+    "transpiling": "Transpiling and rendering..."
   },
   "knowledge": {
     "add": {

@@ -1,4 +1,4 @@
-import { CodeBlockView, HtmlArtifactsCard } from '@renderer/components/CodeBlockView'
+import { CodeBlockView, HtmlArtifactsCard, TsxArtifactsCard } from '@renderer/components/CodeBlockView'
 import { useSettings } from '@renderer/hooks/useSettings'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import store from '@renderer/store'
@@ -48,6 +48,10 @@ const CodeBlock: React.FC<Props> = ({ children, className, node, blockId }) => {
       if (language === 'html') {
         const isOpenFence = isOpenFenceBlock(children?.length, languageMatch?.[1]?.length, node?.position)
         return <HtmlArtifactsCard html={children} onSave={handleSave} isStreaming={isStreaming && isOpenFence} />
+      }
+      if (language === 'tsx' || language === 'jsx') {
+        const isOpenFence = isOpenFenceBlock(children?.length, languageMatch?.[1]?.length, node?.position)
+        return <TsxArtifactsCard tsx={children} onSave={handleSave} isStreaming={isStreaming && isOpenFence} blockId={blockId} />
       }
     }
 

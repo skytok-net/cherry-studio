@@ -77,6 +77,12 @@ import WebSocketService from './services/WebSocketService'
 import { setOpenLinkExternal } from './services/WebviewService'
 import { windowService } from './services/WindowService'
 import { calculateDirectorySize, getResourcePath } from './utils'
+import { NetworkIpcHandlers } from './services/networkProxy/NetworkIpcHandlers'
+import { createNetworkProxyService } from './services/networkProxy/NetworkProxyService'
+import { createSecurityPolicy } from './services/securityPolicy/SecurityPolicy'
+import { createDomainReputationService } from './services/domainReputation/DomainReputationService'
+import { createRequestCacheFromSettings } from './services/requestCache/RequestCache'
+import { DEFAULT_NETWORK_SETTINGS } from './types/networkTypes'
 import { decrypt, encrypt } from './utils/aes'
 import {
   getCacheDir,
@@ -115,6 +121,24 @@ function extractPluginError(error: unknown): PluginError | null {
 export function registerIpc(mainWindow: BrowserWindow, app: Electron.App) {
   const appUpdater = new AppUpdater()
   const notificationService = new NotificationService()
+
+  // Initialize network proxy services
+  const networkSettings = DEFAULT_NETWORK_SETTINGS
+  const securityPolicy = createSecurityPolicy(networkSettings)
+  const domainReputationService = createDomainReputationService({
+    enableBuiltInProviders: false,
+    cacheTimeoutMs: 300000, // 5 minutes
+    cacheCleanupIntervalMs: 600000, // 10 minutes
+    maxCacheEntries: 1000,
+    providers: {}
+  })
+  const requestCache = createRequestCacheFromSettings(networkSettings)
+  const networkProxyService = createNetworkProxyService(
+    securityPolicy,
+    domainReputationService,
+    requestCache
+  )
+  const networkIpcHandlers = new NetworkIpcHandlers(networkProxyService, securityPolicy, networkSettings)
 
   // Register shutdown handlers
   powerMonitorService.registerShutdownHandler(() => {
@@ -1037,4 +1061,7 @@ export function registerIpc(mainWindow: BrowserWindow, app: Electron.App) {
   ipcMain.handle(IpcChannel.WebSocket_Status, WebSocketService.getStatus)
   ipcMain.handle(IpcChannel.WebSocket_SendFile, WebSocketService.sendFile)
   ipcMain.handle(IpcChannel.WebSocket_GetAllCandidates, WebSocketService.getAllCandidates)
+
+  // Network Proxy
+  networkIpcHandlers.registerHandlers()
 }

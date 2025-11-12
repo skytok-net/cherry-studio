@@ -281,7 +281,7 @@ export type PaintingParams = {
   providerId?: string
 }
 
-export type PaintingProvider = 'zhipu' | 'aihubmix' | 'silicon' | 'dmxapi' | 'new-api' | 'ovms' | 'cherryin'
+export type PaintingProvider = 'zhipu' | 'aihubmix' | 'silicon' | 'dmxapi' | 'new-api' | 'ovms' | 'cherryin' | 'fal-ai'
 
 export interface Painting extends PaintingParams {
   model?: string
@@ -289,7 +289,7 @@ export interface Painting extends PaintingParams {
   negativePrompt?: string
   imageSize?: string
   numImages?: number
-  seed?: string
+  seed?: string | number
   steps?: number
   guidanceScale?: number
   promptEnhancement?: boolean
@@ -301,7 +301,7 @@ export interface GeneratePainting extends PaintingParams {
   aspectRatio?: string
   numImages?: number
   styleType?: string
-  seed?: string
+  seed?: string | number
   negativePrompt?: string
   magicPromptOption?: boolean
   renderingSpeed?: string
@@ -324,7 +324,7 @@ export interface EditPainting extends PaintingParams {
   prompt: string
   numImages?: number
   styleType?: string
-  seed?: string
+  seed?: string | number
   magicPromptOption?: boolean
   renderingSpeed?: string
 }
@@ -337,7 +337,7 @@ export interface RemixPainting extends PaintingParams {
   imageWeight: number
   numImages?: number
   styleType?: string
-  seed?: string
+  seed?: string | number
   negativePrompt?: string
   magicPromptOption?: boolean
   renderingSpeed?: string
@@ -349,7 +349,7 @@ export interface ScalePainting extends PaintingParams {
   resemblance?: number
   detail?: number
   numImages?: number
-  seed?: string
+  seed?: string | number
   magicPromptOption?: boolean
   renderingSpeed?: string
 }
@@ -391,8 +391,21 @@ export interface OvmsPainting extends PaintingParams {
   response_format?: 'url' | 'b64_json'
 }
 
+export interface FalAIPainting extends PaintingParams {
+  generationId?: string
+  model?: string
+  prompt?: string
+  negativePrompt?: string
+  imageSize?: string
+  numImages?: number
+  seed?: string | number
+  guidanceScale?: number
+  numInferenceSteps?: number
+  status?: 'starting' | 'processing' | 'succeeded' | 'failed' | 'cancelled'
+}
+
 export type PaintingAction = Partial<
-  GeneratePainting & RemixPainting & EditPainting & ScalePainting & DmxapiPainting & TokenFluxPainting & OvmsPainting
+  GeneratePainting & RemixPainting & EditPainting & ScalePainting & DmxapiPainting & TokenFluxPainting & OvmsPainting & FalAIPainting
 > &
   PaintingParams
 
@@ -406,15 +419,17 @@ export interface PaintingsState {
   // Zhipu
   zhipu_paintings: Painting[]
   // Aihubmix
-  aihubmix_image_generate: Partial<GeneratePainting> & PaintingParams[]
-  aihubmix_image_remix: Partial<RemixPainting> & PaintingParams[]
-  aihubmix_image_edit: Partial<EditPainting> & PaintingParams[]
-  aihubmix_image_upscale: Partial<ScalePainting> & PaintingParams[]
+  aihubmix_image_generate: Array<Partial<GeneratePainting> & PaintingParams>
+  aihubmix_image_remix: Array<Partial<RemixPainting> & PaintingParams>
+  aihubmix_image_edit: Array<Partial<EditPainting> & PaintingParams>
+  aihubmix_image_upscale: Array<Partial<ScalePainting> & PaintingParams>
   // OpenAI
-  openai_image_generate: Partial<GeneratePainting> & PaintingParams[]
-  openai_image_edit: Partial<EditPainting> & PaintingParams[]
+  openai_image_generate: Array<Partial<GeneratePainting> & PaintingParams>
+  openai_image_edit: Array<Partial<EditPainting> & PaintingParams>
   // OVMS
   ovms_paintings: OvmsPainting[]
+  // fal.ai
+  falai_paintings: FalAIPainting[]
 }
 
 export type MinAppType = {

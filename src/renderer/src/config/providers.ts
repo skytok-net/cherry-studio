@@ -51,6 +51,7 @@ import StepProviderLogo from '@renderer/assets/images/providers/step.png'
 import TencentCloudProviderLogo from '@renderer/assets/images/providers/tencent-cloud-ti.png'
 import TogetherProviderLogo from '@renderer/assets/images/providers/together.png'
 import TokenFluxProviderLogo from '@renderer/assets/images/providers/tokenflux.png'
+import FalAIProviderLogo from '@renderer/assets/images/providers/fal-ai.png'
 import VertexAIProviderLogo from '@renderer/assets/images/providers/vertexai.svg'
 import BytedanceProviderLogo from '@renderer/assets/images/providers/volcengine.png'
 import VoyageAIProviderLogo from '@renderer/assets/images/providers/voyageai.png'
@@ -254,6 +255,26 @@ export const SYSTEM_PROVIDERS_CONFIG: Record<SystemProviderId, SystemProvider> =
     apiKey: '',
     apiHost: 'https://www.sophnet.com/api/open-apis/v1',
     models: [],
+    isSystem: true,
+    enabled: false
+  },
+  falai: {
+    id: 'falai',
+    name: 'fal.ai',
+    type: 'openai',
+    apiKey: '',
+    apiHost: 'https://fal.run',
+    models: SYSTEM_MODELS['fal-ai'],
+    isSystem: true,
+    enabled: false
+  },
+  'fal-ai': {
+    id: 'fal-ai',
+    name: 'fal.ai',
+    type: 'openai',
+    apiKey: '',
+    apiHost: 'https://fal.run',
+    models: SYSTEM_MODELS['fal-ai'],
     isSystem: true,
     enabled: false
   },
@@ -741,7 +762,9 @@ export const PROVIDER_LOGO_MAP: AtLeast<SystemProviderId, string> = {
   aionly: AiOnlyProviderLogo,
   longcat: LongCatProviderLogo,
   huggingface: HuggingfaceProviderLogo,
-  sophnet: SophnetProviderLogo
+  sophnet: SophnetProviderLogo,
+  falai: FalAIProviderLogo,
+  'fal-ai': FalAIProviderLogo
 } as const
 
 export function getProviderLogo(providerId: string) {
@@ -829,6 +852,28 @@ export const PROVIDER_URLS: Record<SystemProviderId, ProviderUrls> = {
       apiKey: 'https://sophnet.com/#/project/key',
       docs: 'https://sophnet.com/docs/component/introduce.html',
       models: 'https://sophnet.com/#/model/list'
+    }
+  },
+  falai: {
+    api: {
+      url: 'https://fal.run'
+    },
+    websites: {
+      official: 'https://fal.ai',
+      apiKey: 'https://fal.ai/dashboard/api-keys',
+      docs: 'https://docs.fal.ai',
+      models: 'https://fal.ai/models'
+    }
+  },
+  'fal-ai': {
+    api: {
+      url: 'https://fal.run'
+    },
+    websites: {
+      official: 'https://fal.ai',
+      apiKey: 'https://fal.ai/dashboard/api-keys',
+      docs: 'https://docs.fal.ai',
+      models: 'https://fal.ai/models'
     }
   },
   ppio: {

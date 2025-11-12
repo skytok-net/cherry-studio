@@ -85,6 +85,38 @@ export function getFileNameFromHtmlTitle(title: string): string {
   return title.replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, '-')
 }
 
+/**
+ * Extract component name from TSX/JSX code
+ * @param tsx TSX/JSX code string
+ * @returns Component name or empty string
+ */
+export function extractComponentName(tsx: string): string {
+  if (!tsx) return ''
+
+  // Try to find function component: function ComponentName() or const ComponentName =
+  const functionComponentRegex = /(?:function|const|export\s+(?:default\s+)?(?:function|const))\s+([A-Z][a-zA-Z0-9]*)\s*[=:(]/
+  const functionMatch = tsx.match(functionComponentRegex)
+  if (functionMatch && functionMatch[1]) {
+    return functionMatch[1]
+  }
+
+  // Try to find class component: class ComponentName extends
+  const classComponentRegex = /(?:export\s+(?:default\s+)?)?class\s+([A-Z][a-zA-Z0-9]*)\s+extends/
+  const classMatch = tsx.match(classComponentRegex)
+  if (classMatch && classMatch[1]) {
+    return classMatch[1]
+  }
+
+  // Try to find arrow function component: const ComponentName = () =>
+  const arrowFunctionRegex = /const\s+([A-Z][a-zA-Z0-9]*)\s*=\s*(?:\([^)]*\)|\(\))\s*=>/
+  const arrowMatch = tsx.match(arrowFunctionRegex)
+  if (arrowMatch && arrowMatch[1]) {
+    return arrowMatch[1]
+  }
+
+  return ''
+}
+
 export function removeSvgEmptyLines(text: string): string {
   // 用正则表达式匹配 <svg> 标签内的内容
   const svgPattern = /(<svg[\s\S]*?<\/svg>)/g

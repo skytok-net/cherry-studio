@@ -11,6 +11,7 @@ import { Route, Routes, useParams } from 'react-router-dom'
 
 import AihubmixPage from './AihubmixPage'
 import DmxapiPage from './DmxapiPage'
+import FalAIPage from './FalAIPage'
 import NewApiPage from './NewApiPage'
 import OvmsPage from './OvmsPage'
 import SiliconPage from './SiliconPage'
@@ -19,7 +20,7 @@ import ZhipuPage from './ZhipuPage'
 
 const logger = loggerService.withContext('PaintingsRoutePage')
 
-const BASE_OPTIONS: SystemProviderId[] = ['zhipu', 'aihubmix', 'silicon', 'dmxapi', 'tokenflux', 'ovms']
+const BASE_OPTIONS: SystemProviderId[] = ['zhipu', 'aihubmix', 'silicon', 'dmxapi', 'tokenflux', 'ovms', 'fal-ai']
 
 const PaintingsRoutePage: FC = () => {
   const params = useParams()
@@ -58,6 +59,7 @@ const PaintingsRoutePage: FC = () => {
       <Route path="/dmxapi" element={<DmxapiPage Options={validOptions} />} />
       <Route path="/tokenflux" element={<TokenFluxPage Options={validOptions} />} />
       <Route path="/ovms" element={<OvmsPage Options={validOptions} />} />
+      <Route path="/fal-ai" element={<FalAIPage Options={validOptions} />} />
       <Route path="/new-api" element={<NewApiPage Options={validOptions} />} />
       {/* new-api family providers are mounted dynamically below */}
       {newApiProviders.map((p) => (

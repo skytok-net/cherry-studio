@@ -19,7 +19,7 @@ import { translateText } from '@renderer/services/TranslateService'
 import { useAppDispatch } from '@renderer/store'
 import { setGenerating } from '@renderer/store/runtime'
 import type { FileMetadata } from '@renderer/types'
-import type { PaintingAction, PaintingsState } from '@renderer/types'
+import type { Painting, PaintingAction, PaintingsState } from '@renderer/types'
 import { getErrorMessage, uuid } from '@renderer/utils'
 import { Avatar, Button, Input, InputNumber, Radio, Segmented, Select, Slider, Switch, Tooltip, Upload } from 'antd'
 import TextArea from 'antd/es/input/TextArea'
@@ -514,7 +514,7 @@ const AihubmixPage: FC<{ Options: string[] }> = ({ Options }) => {
     }
   }
 
-  const handleRetry = async (painting: PaintingAction) => {
+  const handleRetry = async (painting: Painting) => {
     setIsLoading(true)
     try {
       const validFiles = await downloadImages(painting.urls)
@@ -546,7 +546,7 @@ const AihubmixPage: FC<{ Options: string[] }> = ({ Options }) => {
     return newPainting
   }
 
-  const onDeletePainting = (paintingToDelete: PaintingAction) => {
+  const onDeletePainting = (paintingToDelete: Painting) => {
     if (paintingToDelete.id === painting.id) {
       const currentIndex = filteredPaintings.findIndex((p) => p.id === paintingToDelete.id)
 
@@ -786,7 +786,7 @@ const AihubmixPage: FC<{ Options: string[] }> = ({ Options }) => {
     )
   }
 
-  const onSelectPainting = (newPainting: PaintingAction) => {
+  const onSelectPainting = (newPainting: Painting) => {
     if (generating) return
     setPainting(newPainting)
     setCurrentImageIndex(0)
