@@ -19,22 +19,8 @@
     {
       "idx": 2,
       "version": "6",
-      "when": 1736551673882,
-      "tag": "0002_unstructured_jobs",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1736551673983,
-      "tag": "0003_unstructured_usage",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1736551674084,
-      "tag": "0004_unstructured_cache",
+      "when": 1762526423527,
+      "tag": "0002_wealthy_naoko",
       "breakpoints": true
     }
   ]
