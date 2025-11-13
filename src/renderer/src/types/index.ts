@@ -396,11 +396,29 @@ export interface FalAIPainting extends PaintingParams {
   model?: string
   prompt?: string
   negativePrompt?: string
+  // Size options - either imageSize OR aspectRatio depending on model
   imageSize?: string
+  aspectRatio?: string
   numImages?: number
   seed?: string | number
   guidanceScale?: number
   numInferenceSteps?: number
+  // New FLUX 1.1 Ultra parameters
+  enhancePrompt?: boolean
+  imageUrl?: string
+  imagePromptStrength?: number
+  rawMode?: boolean
+  // FLUX Dev/Schnell parameters
+  acceleration?: 'none' | 'regular' | 'high'
+  // Output and safety parameters
+  outputFormat?: 'jpeg' | 'png'
+  enableSafetyChecker?: boolean
+  safetyTolerance?: number // 1-6, where 1 is most strict and 6 is most permissive
+  // SDXL specific parameters
+  loras?: Array<{ path: string; scale?: number }>
+  embeddings?: Array<{ path: string; tokens?: string[] }>
+  expandPrompt?: boolean
+  safetyCheckerVersion?: 'v1' | 'v2'
   status?: 'starting' | 'processing' | 'succeeded' | 'failed' | 'cancelled'
 }
 

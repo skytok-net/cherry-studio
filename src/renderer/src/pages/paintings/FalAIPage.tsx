@@ -37,8 +37,10 @@ import FalAIService from './utils/FalAIService'
 const logger = loggerService.withContext('FalAIPage')
 
 const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
-  const [models] = useState<FalAIModel[]>(FAL_AI_MODELS)
-  const [selectedModel, setSelectedModel] = useState<FalAIModel | null>(FAL_AI_MODELS[0] || null)
+  const [models, setModels] = useState<FalAIModel[]>(FAL_AI_MODELS || [])
+  const [selectedModel, setSelectedModel] = useState<FalAIModel | null>(
+    FAL_AI_MODELS && FAL_AI_MODELS.length > 0 ? FAL_AI_MODELS[0] : null
+  )
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
@@ -69,10 +71,11 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
   }, [falaiProvider])
 
   const getNewPainting = useCallback(() => {
+    const defaultModelId = selectedModel?.id || (FAL_AI_MODELS && FAL_AI_MODELS.length > 0 ? FAL_AI_MODELS[0].id : '')
     return {
       ...DEFAULT_FAL_AI_PAINTING,
       id: uuid(),
-      model: selectedModel?.id || FAL_AI_MODELS[0]?.id || ''
+      model: defaultModelId
     }
   }, [selectedModel])
 
@@ -152,7 +155,7 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
         setSelectedModel(model)
       }
     } else {
-      setSelectedModel(models[0] || null)
+      setSelectedModel(models.length > 0 ? models[0] : null)
     }
   }
 
@@ -175,6 +178,31 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
       setIsTranslating(false)
     }
   }
+
+  // Load models dynamically from Fal.ai API
+  useEffect(() => {
+    const loadModels = async () => {
+      if (!falAIService) return
+
+      try {
+        const fetchedModels = await falAIService.fetchModels()
+        if (fetchedModels.length > 0) {
+          setModels(fetchedModels)
+          // Update selected model if current one is not in the list
+          if (selectedModel && !fetchedModels.find((m) => m.id === selectedModel.id)) {
+            setSelectedModel(fetchedModels[0])
+          } else if (!selectedModel) {
+            setSelectedModel(fetchedModels[0])
+          }
+        }
+      } catch (error) {
+        logger.error('Failed to load models:', error as Error)
+        // Keep using hardcoded models on error
+      }
+    }
+
+    loadModels()
+  }, [falAIService]) // Only run when service is available
 
   useEffect(() => {
     if (falaiPaintings.length === 0) {
@@ -260,19 +288,84 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
 
     try {
       const requestBody: Parameters<typeof falAIService.createGeneration>[1] = {
-        prompt,
-        negative_prompt: painting.negativePrompt || undefined,
-        image_size: painting.imageSize || '1024x1024',
-        num_inference_steps: painting.numInferenceSteps || selectedModel.defaultNumInferenceSteps,
-        guidance_scale: painting.guidanceScale || selectedModel.defaultGuidanceScale,
-        seed:
-          painting.seed !== undefined
-            ? typeof painting.seed === 'string'
-              ? Number(painting.seed)
-              : painting.seed
-            : undefined,
-        num_images: painting.numImages || 1
+        prompt
       }
+
+      // Add model-specific parameters based on capabilities
+      if (selectedModel.supportsNegativePrompt && painting.negativePrompt) {
+        requestBody.negative_prompt = painting.negativePrompt
+      }
+
+      // Handle size/aspect ratio based on model
+      if (selectedModel.usesAspectRatio) {
+        requestBody.aspect_ratio = painting.aspectRatio || '16:9'
+      } else {
+        requestBody.image_size = painting.imageSize || 'landscape_4_3'
+      }
+
+      // Guidance and inference steps
+      if (selectedModel.supportsGuidanceScale) {
+        requestBody.guidance_scale = painting.guidanceScale ?? selectedModel.defaultGuidanceScale
+      }
+      if (selectedModel.supportsNumInferenceSteps) {
+        requestBody.num_inference_steps = painting.numInferenceSteps ?? selectedModel.defaultNumInferenceSteps
+      }
+
+      // FLUX 1.1 Ultra specific
+      if (selectedModel.supportsEnhancePrompt && painting.enhancePrompt) {
+        requestBody.enhance_prompt = painting.enhancePrompt
+      }
+      if (selectedModel.supportsImageInput && painting.imageUrl) {
+        requestBody.image_url = painting.imageUrl
+      }
+      if (selectedModel.supportsImagePromptStrength && painting.imagePromptStrength !== undefined) {
+        requestBody.image_prompt_strength = painting.imagePromptStrength
+      }
+      if (selectedModel.supportsRawMode && painting.rawMode) {
+        requestBody.raw = painting.rawMode
+      }
+
+      // Acceleration (Dev/Schnell)
+      if (selectedModel.supportsAcceleration && painting.acceleration) {
+        requestBody.acceleration = painting.acceleration
+      }
+
+      // Output format
+      if (selectedModel.supportsOutputFormat && painting.outputFormat) {
+        if (selectedModel.id.includes('fast-sdxl')) {
+          requestBody.format = painting.outputFormat // SDXL uses 'format'
+        } else {
+          requestBody.output_format = painting.outputFormat
+        }
+      }
+
+      // Safety controls
+      if (selectedModel.supportsSafetyChecker && painting.enableSafetyChecker !== undefined) {
+        requestBody.enable_safety_checker = painting.enableSafetyChecker
+      }
+      if (selectedModel.supportsSafetyTolerance && painting.safetyTolerance) {
+        requestBody.safety_tolerance = String(painting.safetyTolerance)
+      }
+
+      // SDXL specific
+      if (selectedModel.supportsLoRA && painting.loras) {
+        requestBody.loras = painting.loras
+      }
+      if (selectedModel.supportsEmbeddings && painting.embeddings) {
+        requestBody.embeddings = painting.embeddings
+      }
+      if (selectedModel.supportsExpandPrompt && painting.expandPrompt) {
+        requestBody.expand_prompt = painting.expandPrompt
+      }
+      if (painting.safetyCheckerVersion) {
+        requestBody.safety_checker_version = painting.safetyCheckerVersion
+      }
+
+      // Common parameters
+      if (painting.seed !== undefined) {
+        requestBody.seed = typeof painting.seed === 'string' ? Number(painting.seed) : painting.seed
+      }
+      requestBody.num_images = painting.numImages || 1
 
       updatePaintingState({
         model: selectedModel.id,
@@ -364,6 +457,21 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
     )
   }
 
+  if (!models || models.length === 0) {
+    return (
+      <Container>
+        <Navbar>
+          <NavbarCenter>{t('paintings.title')}</NavbarCenter>
+        </Navbar>
+        <ContentContainer>
+          <div style={{ padding: '20px', textAlign: 'center' }}>
+            No Fal.ai models available. Please check your configuration.
+          </div>
+        </ContentContainer>
+      </Container>
+    )
+  }
+
   return (
     <Container>
       <Navbar>
@@ -421,20 +529,38 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
             ))}
           </Select>
 
-          {/* Image Size */}
+          {/* Image Size or Aspect Ratio based on model */}
           {selectedModel && (
             <>
-              <SectionTitle style={{ marginBottom: 5, marginTop: 10 }}>{t('paintings.image.size')}</SectionTitle>
-              <Select
-                style={{ width: '100%', marginBottom: 12 }}
-                value={painting.imageSize || '1024x1024'}
-                onChange={(value) => updatePaintingState({ imageSize: value })}>
-                {selectedModel.imageSizes.map((size) => (
-                  <Select.Option key={size.value} value={size.value}>
-                    {size.value}
-                  </Select.Option>
-                ))}
-              </Select>
+              {selectedModel.usesAspectRatio ? (
+                <>
+                  <SectionTitle style={{ marginBottom: 5, marginTop: 10 }}>Aspect Ratio</SectionTitle>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.aspectRatio || '16:9'}
+                    onChange={(value) => updatePaintingState({ aspectRatio: value })}>
+                    {selectedModel.aspectRatios?.map((ratio) => (
+                      <Select.Option key={ratio.value} value={ratio.value}>
+                        {ratio.label || ratio.value}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </>
+              ) : (
+                <>
+                  <SectionTitle style={{ marginBottom: 5, marginTop: 10 }}>{t('paintings.image.size')}</SectionTitle>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.imageSize || 'landscape_4_3'}
+                    onChange={(value) => updatePaintingState({ imageSize: value })}>
+                    {selectedModel.imageSizes?.map((size) => (
+                      <Select.Option key={size.value} value={size.value}>
+                        {size.label || size.value}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </>
+              )}
 
               {/* Number of Images */}
               <SectionTitle style={{ marginBottom: 5, marginTop: 10 }}>{t('paintings.number_images')}</SectionTitle>
@@ -463,7 +589,11 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
               )}
 
               {/* Advanced Parameters */}
-              <SectionTitle style={{ marginBottom: 5, marginTop: 10 }}>{t('paintings.input_parameters')}</SectionTitle>
+              {(selectedModel.supportsGuidanceScale || selectedModel.supportsNumInferenceSteps) && (
+                <SectionTitle style={{ marginBottom: 5, marginTop: 10 }}>
+                  {t('paintings.input_parameters')}
+                </SectionTitle>
+              )}
 
               {/* Guidance Scale */}
               {selectedModel.supportsGuidanceScale && (
@@ -488,23 +618,25 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
               )}
 
               {/* Number of Inference Steps */}
-              <ParameterField>
-                <ParameterLabel>
-                  <ParameterName>
-                    {t('paintings.inference_steps')}
-                    <Tooltip title={t('paintings.inference_steps_tip')}>
-                      <InfoIcon />
-                    </Tooltip>
-                  </ParameterName>
-                </ParameterLabel>
-                <InputNumber
-                  style={{ width: '100%', marginBottom: 12 }}
-                  min={1}
-                  max={50}
-                  value={painting.numInferenceSteps || selectedModel.defaultNumInferenceSteps || 28}
-                  onChange={(value) => updatePaintingState({ numInferenceSteps: value || 28 })}
-                />
-              </ParameterField>
+              {selectedModel.supportsNumInferenceSteps && (
+                <ParameterField>
+                  <ParameterLabel>
+                    <ParameterName>
+                      {t('paintings.inference_steps')}
+                      <Tooltip title={t('paintings.inference_steps_tip')}>
+                        <InfoIcon />
+                      </Tooltip>
+                    </ParameterName>
+                  </ParameterLabel>
+                  <InputNumber
+                    style={{ width: '100%', marginBottom: 12 }}
+                    min={1}
+                    max={50}
+                    value={painting.numInferenceSteps || selectedModel.defaultNumInferenceSteps || 28}
+                    onChange={(value) => updatePaintingState({ numInferenceSteps: value || 28 })}
+                  />
+                </ParameterField>
+              )}
 
               {/* Seed */}
               {selectedModel.supportsSeed && (
@@ -524,6 +656,161 @@ const FalAIPage: FC<{ Options: string[] }> = ({ Options }) => {
                     onChange={(value) => updatePaintingState({ seed: value ?? undefined })}
                     placeholder={t('paintings.seed_desc_tip')}
                   />
+                </ParameterField>
+              )}
+
+              {/* New Parameters Section */}
+              <SectionTitle style={{ marginBottom: 5, marginTop: 15 }}>Advanced Settings</SectionTitle>
+
+              {/* Enhance Prompt */}
+              {selectedModel.supportsEnhancePrompt && (
+                <ParameterField>
+                  <ParameterLabel>
+                    <ParameterName>
+                      Enhance Prompt
+                      <Tooltip title="AI will enhance your prompt for better results">
+                        <InfoIcon />
+                      </Tooltip>
+                    </ParameterName>
+                  </ParameterLabel>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.enhancePrompt ? 'yes' : 'no'}
+                    onChange={(value) => updatePaintingState({ enhancePrompt: value === 'yes' })}>
+                    <Select.Option value="no">Off</Select.Option>
+                    <Select.Option value="yes">On</Select.Option>
+                  </Select>
+                </ParameterField>
+              )}
+
+              {/* Raw Mode */}
+              {selectedModel.supportsRawMode && (
+                <ParameterField>
+                  <ParameterLabel>
+                    <ParameterName>
+                      Raw Mode
+                      <Tooltip title="Generate less processed, more natural-looking images">
+                        <InfoIcon />
+                      </Tooltip>
+                    </ParameterName>
+                  </ParameterLabel>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.rawMode ? 'yes' : 'no'}
+                    onChange={(value) => updatePaintingState({ rawMode: value === 'yes' })}>
+                    <Select.Option value="no">Off</Select.Option>
+                    <Select.Option value="yes">On</Select.Option>
+                  </Select>
+                </ParameterField>
+              )}
+
+              {/* Acceleration */}
+              {selectedModel.supportsAcceleration && (
+                <ParameterField>
+                  <ParameterLabel>
+                    <ParameterName>
+                      Acceleration
+                      <Tooltip title="Speed up generation (may affect quality)">
+                        <InfoIcon />
+                      </Tooltip>
+                    </ParameterName>
+                  </ParameterLabel>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.acceleration || 'none'}
+                    onChange={(value) => updatePaintingState({ acceleration: value as 'none' | 'regular' | 'high' })}>
+                    <Select.Option value="none">None</Select.Option>
+                    <Select.Option value="regular">Regular</Select.Option>
+                    <Select.Option value="high">High</Select.Option>
+                  </Select>
+                </ParameterField>
+              )}
+
+              {/* Output Format */}
+              {selectedModel.supportsOutputFormat && (
+                <ParameterField>
+                  <ParameterLabel>
+                    <ParameterName>
+                      Output Format
+                      <Tooltip title="Image file format">
+                        <InfoIcon />
+                      </Tooltip>
+                    </ParameterName>
+                  </ParameterLabel>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.outputFormat || 'jpeg'}
+                    onChange={(value) => updatePaintingState({ outputFormat: value as 'jpeg' | 'png' })}>
+                    <Select.Option value="jpeg">JPEG (Smaller)</Select.Option>
+                    <Select.Option value="png">PNG (Lossless)</Select.Option>
+                  </Select>
+                </ParameterField>
+              )}
+
+              {/* Safety Checker */}
+              {selectedModel.supportsSafetyChecker && (
+                <ParameterField>
+                  <ParameterLabel>
+                    <ParameterName>
+                      Safety Checker
+                      <Tooltip title="Enable content safety filtering">
+                        <InfoIcon />
+                      </Tooltip>
+                    </ParameterName>
+                  </ParameterLabel>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.enableSafetyChecker !== false ? 'yes' : 'no'}
+                    onChange={(value) => updatePaintingState({ enableSafetyChecker: value === 'yes' })}>
+                    <Select.Option value="no">Off</Select.Option>
+                    <Select.Option value="yes">On</Select.Option>
+                  </Select>
+                </ParameterField>
+              )}
+
+              {/* Safety Tolerance */}
+              {selectedModel.supportsSafetyTolerance && painting.enableSafetyChecker !== false && (
+                <ParameterField>
+                  <ParameterLabel>
+                    <ParameterName>
+                      Safety Tolerance
+                      <Tooltip title="1 = Most strict, 6 = Most permissive">
+                        <InfoIcon />
+                      </Tooltip>
+                    </ParameterName>
+                  </ParameterLabel>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.safetyTolerance || 2}
+                    onChange={(value) => updatePaintingState({ safetyTolerance: value as number })}>
+                    <Select.Option value={1}>1 - Most Strict</Select.Option>
+                    <Select.Option value={2}>2 - Strict</Select.Option>
+                    <Select.Option value={3}>3 - Moderate</Select.Option>
+                    <Select.Option value={4}>4 - Lenient</Select.Option>
+                    <Select.Option value={5}>5 - Very Lenient</Select.Option>
+                    <Select.Option value={6}>6 - Most Permissive</Select.Option>
+                  </Select>
+                </ParameterField>
+              )}
+
+              {/* Expand Prompt (SDXL) */}
+              {selectedModel.supportsExpandPrompt && (
+                <ParameterField>
+                  <ParameterLabel>
+                    <ParameterName>
+                      Expand Prompt
+                      <Tooltip title="Automatically expand and improve your prompt">
+                        <InfoIcon />
+                      </Tooltip>
+                    </ParameterName>
+                  </ParameterLabel>
+                  <Select
+                    style={{ width: '100%', marginBottom: 12 }}
+                    value={painting.expandPrompt ? 'yes' : 'no'}
+                    onChange={(value) => updatePaintingState({ expandPrompt: value === 'yes' })}>
+                    <Select.Option value="no">Off</Select.Option>
+                    <Select.Option value="yes">On</Select.Option>
+                  </Select>
                 </ParameterField>
               )}
             </>

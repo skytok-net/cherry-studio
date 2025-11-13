@@ -260,7 +260,7 @@ export const SYSTEM_PROVIDERS_CONFIG: Record<SystemProviderId, SystemProvider> =
   },
   falai: {
     id: 'falai',
-    name: 'fal.ai',
+    name: 'Fal.ai',
     type: 'openai',
     apiKey: '',
     apiHost: 'https://fal.run',
@@ -270,7 +270,7 @@ export const SYSTEM_PROVIDERS_CONFIG: Record<SystemProviderId, SystemProvider> =
   },
   'fal-ai': {
     id: 'fal-ai',
-    name: 'fal.ai',
+    name: 'Fal.ai',
     type: 'openai',
     apiKey: '',
     apiHost: 'https://fal.run',
