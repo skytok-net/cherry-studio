@@ -26,6 +26,7 @@ export class ReduxService extends EventEmitter {
     ipcMain.handle(IpcChannel.ReduxStoreReady, () => {
       this.isReady = true
       this.emit('ready')
+      return { success: true } // Return a response for invoke pattern
     })
 
     // 监听 store 状态变化
@@ -35,25 +36,40 @@ export class ReduxService extends EventEmitter {
     })
   }
 
-  private async waitForStoreReady(webContents: Electron.WebContents, timeout = 10000): Promise<void> {
+  private async waitForStoreReady(webContents: Electron.WebContents, timeout = 30000): Promise<void> {
     if (this.isReady) return
 
-    const startTime = Date.now()
-    while (Date.now() - startTime < timeout) {
-      try {
-        const isReady = await webContents.executeJavaScript(`
-          !!window.store && typeof window.store.getState === 'function'
-        `)
-        if (isReady) {
-          this.isReady = true
-          return
-        }
-      } catch (error) {
-        // 忽略错误，继续等待
+    // First, try to wait for the 'ready' event (more efficient)
+    const readyPromise = new Promise<void>((resolve) => {
+      const handler = () => {
+        this.off('ready', handler)
+        resolve()
       }
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
-    throw new Error('Timeout waiting for Redux store to be ready')
+      this.once('ready', handler)
+    })
+
+    // Fallback: Poll for store readiness
+    const pollPromise = (async () => {
+      const startTime = Date.now()
+      while (Date.now() - startTime < timeout) {
+        try {
+          const isReady = await webContents.executeJavaScript(`
+            !!window.store && typeof window.store.getState === 'function'
+          `)
+          if (isReady) {
+            this.isReady = true
+            return
+          }
+        } catch (error) {
+          // 忽略错误，继续等待
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      throw new Error('Timeout waiting for Redux store to be ready')
+    })()
+
+    // Race between event-based and polling approaches
+    await Promise.race([readyPromise, pollPromise])
   }
 
   // 添加同步获取状态的方法

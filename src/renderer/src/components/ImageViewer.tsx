@@ -39,13 +39,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, style, ...props }) => {
         if (!match) throw new Error('Invalid base64 image format')
         const mimeType = match[1]
         const byteArray = Base64.toUint8Array(match[2])
-        const blob = new Blob([byteArray], { type: mimeType })
+        const blob = new Blob([Buffer.from(byteArray)], { type: mimeType })
         await navigator.clipboard.write([new ClipboardItem({ [mimeType]: blob })])
       } else if (src.startsWith('file://')) {
         // 处理本地文件路径
         const bytes = await window.api.fs.read(src)
         const mimeType = mime.getType(src) || 'application/octet-stream'
-        const blob = new Blob([bytes], { type: mimeType })
+        const blob = new Blob([Buffer.from(bytes)], { type: mimeType })
         await navigator.clipboard.write([
           new ClipboardItem({
             [mimeType]: blob

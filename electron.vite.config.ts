@@ -101,7 +101,8 @@ export default defineConfig({
       }
     },
     optimizeDeps: {
-      exclude: ['pyodide']
+      exclude: ['pyodide'],
+      // Dedupe CodeMirror packages to prevent multiple instances
     },
     worker: {
       format: 'es'
@@ -115,6 +116,21 @@ export default defineConfig({
           selectionToolbar: resolve(__dirname, 'src/renderer/selectionToolbar.html'),
           selectionAction: resolve(__dirname, 'src/renderer/selectionAction.html'),
           traceWindow: resolve(__dirname, 'src/renderer/traceWindow.html')
+        },
+        output: {
+          manualChunks(id) {
+            // Ensure CodeMirror packages are bundled together to prevent duplication
+            if (id.includes('@codemirror/')) {
+              return 'codemirror'
+            }
+            if (id.includes('@uiw/react-codemirror') || id.includes('@uiw/codemirror')) {
+              return 'codemirror'
+            }
+            if (id.includes('codemirror-lang-') || id.includes('@viz-js/lang-')) {
+              return 'codemirror'
+            }
+            return undefined
+          }
         },
         onwarn(warning, warn) {
           if (warning.code === 'COMMONJS_VARIABLE_IN_ESM') return

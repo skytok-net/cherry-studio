@@ -49,6 +49,8 @@ const GLOBAL_IMPORT_MAP: Record<string, string> = {
   'react-dom': 'ReactDOM',
   'react/jsx-runtime': 'React',
   '@xyflow/react': 'ReactFlow',
+  // Alias for legacy reactflow package name used in many examples
+  reactflow: 'ReactFlow',
   'lucide-react': 'LucideReact',
   clsx: 'clsx'
 }
@@ -104,7 +106,12 @@ export class ArtifactTranspilerService {
 
         // Handle default import
         if (defaultImport) {
-          parts.push(`const ${defaultImport} = window.${globalVar};`)
+          // Special handling for ReactFlow: default import should be the ReactFlow component
+          if (module === '@xyflow/react' || module === 'reactflow') {
+            parts.push(`const ${defaultImport} = window.${globalVar}.ReactFlow;`)
+          } else {
+            parts.push(`const ${defaultImport} = window.${globalVar};`)
+          }
         }
 
         // Handle named imports
@@ -122,6 +129,11 @@ export class ArtifactTranspilerService {
 
               if (!finalName || !importName) return ''
 
+              // For ReactFlow modules, named imports come from the ReactFlow namespace
+              if (module === '@xyflow/react' || module === 'reactflow') {
+                return `const ${finalName} = window.${globalVar}.${importName};`
+              }
+
               return `const ${finalName} = window.${globalVar}.${importName};`
             })
             .filter(Boolean)
@@ -133,6 +145,10 @@ export class ArtifactTranspilerService {
       })
     })
 
+    // Remove CSS imports (stylesheets are already loaded via <link> tags in sandbox)
+    // Matches: import "file.css", import './file.css', import '../file.css', etc.
+    processedCode = processedCode.replace(/import\s+['"][^'"]*\.css['"];?\s*\n?/g, '')
+    
     // Remove remaining unknown imports (will error if used)
     processedCode = processedCode.replace(/import\s+.*?from\s+['"][^'"]+['"];?\n?/g, '')
 
@@ -161,10 +177,17 @@ export class ArtifactTranspilerService {
 
   // Polyfill require for CommonJS modules
   const require = function(moduleName) {
+    // Handle CSS imports gracefully (stylesheets already loaded via <link> tags)
+    if (typeof moduleName === 'string' && moduleName.endsWith('.css')) {
+      // CSS is already loaded in the sandbox, just return empty object
+      return {};
+    }
+    
     const moduleMap = {
       'react': window.React,
       'react-dom': window.ReactDOM,
       '@xyflow/react': window.ReactFlow,
+      'reactflow': window.ReactFlow, // Alias for @xyflow/react
       'lucide-react': window.LucideReact,
       'clsx': window.clsx
     };

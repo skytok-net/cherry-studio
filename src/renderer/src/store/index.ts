@@ -1,5 +1,6 @@
 import { loggerService } from '@logger'
 import { combineReducers, configureStore } from '@reduxjs/toolkit'
+import { IpcChannel } from '@shared/IpcChannel'
 import { useDispatch, useSelector, useStore } from 'react-redux'
 import { FLUSH, PAUSE, PERSIST, persistReducer, persistStore, PURGE, REGISTER, REHYDRATE } from 'redux-persist'
 import storage from 'redux-persist/lib/storage'
@@ -67,7 +68,7 @@ const persistedReducer = persistReducer(
   {
     key: 'cherry-studio',
     storage,
-    version: 175,
+    version: 174,
     blacklist: ['runtime', 'messages', 'messageBlocks', 'tabs', 'toolPermissions'],
     migrate
   },
@@ -106,6 +107,14 @@ export type RootState = ReturnType<typeof rootReducer>
 export type AppDispatch = typeof store.dispatch
 
 export const persistor = persistStore(store, undefined, () => {
+  // Notify main process that Redux store is ready
+  try {
+    window.electron.ipcRenderer.invoke(IpcChannel.ReduxStoreReady)
+    logger.info('Redux store ready - notified main process')
+  } catch (error) {
+    logger.error('Failed to notify main process of Redux store ready:', error as Error)
+  }
+
   // Initialize notes path after rehydration if empty
   const state = store.getState()
   if (!state.note.notesPath) {

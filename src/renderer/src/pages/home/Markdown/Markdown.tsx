@@ -20,8 +20,8 @@ import { type FC, memo, useCallback, useEffect, useMemo, useRef, useState } from
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown, { type Components, defaultUrlTransform } from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
-// @ts-ignore rehype-mathjax is not typed
-import rehypeMathjax from 'rehype-mathjax'
+// Note: rehype-mathjax removed due to Node.js compatibility issues in renderer
+// Fallback to KaTeX for all math rendering
 import rehypeRaw from 'rehype-raw'
 import remarkCjkFriendly from 'remark-cjk-friendly'
 import remarkGfm from 'remark-gfm'
@@ -120,10 +120,9 @@ const Markdown: FC<Props> = ({ block, postProcess }) => {
       plugins.push(rehypeRaw, rehypeScalableSvg)
     }
     plugins.push([rehypeHeadingIds, { prefix: `heading-${block.id}` }])
-    if (mathEngine === 'KaTeX') {
+    // Always use KaTeX for math rendering (MathJax temporarily disabled due to Node.js compatibility)
+    if (mathEngine === 'KaTeX' || mathEngine === 'MathJax') {
       plugins.push(rehypeKatex)
-    } else if (mathEngine === 'MathJax') {
-      plugins.push(rehypeMathjax)
     }
     return plugins
   }, [mathEngine, messageContent, block.id])

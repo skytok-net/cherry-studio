@@ -39,8 +39,8 @@ export interface UniversalArtifactViewerProps {
 const FRAMEWORK_RUNTIMES: Record<ArtifactFramework, { scripts: string[]; styles: string[] }> = {
   react: {
     scripts: [
-      'https://unpkg.com/react@18/umd/react.production.min.js',
-      'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js'
+      'https://unpkg.com/react@18/umd/react.development.js',
+      'https://unpkg.com/react-dom@18/umd/react-dom.development.js'
     ],
     styles: []
   },
@@ -120,11 +120,162 @@ export function UniversalArtifactViewer({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${framework.toUpperCase()} Artifact Sandbox</title>
 
-  <!-- Framework Runtimes -->
+  <!-- STEP 1: Load React and ReactDOM FIRST -->
   ${runtimeDeps.scripts.map(src => `<script crossorigin src="${src}"></script>`).join('\n  ')}
   ${runtimeDeps.styles.map(href => `<link rel="stylesheet" href="${href}" />`).join('\n  ')}
 
-  <!-- Shared Libraries (loaded AFTER framework ready) -->
+  <!-- STEP 2: Install JSX Runtime SYNCHRONOUSLY (BEFORE ReactFlow loads) -->
+  <script>
+    // CRITICAL: Wait for React to load, then install JSX runtime SYNCHRONOUSLY
+    // This MUST complete before ReactFlow starts loading
+    (function() {
+      console.log('[Sandbox] Waiting for React to load...');
+      var maxAttempts = 200; // 2 seconds max (200 * 10ms)
+      var attempts = 0;
+      
+      // Busy-wait loop (synchronous, blocks script execution)
+      while (attempts < maxAttempts) {
+        if (typeof window.React !== 'undefined' && window.React && 
+            typeof window.ReactDOM !== 'undefined' && window.ReactDOM) {
+          
+          // Install JSX runtime polyfill
+          if ('${framework}' === 'react' || '${framework}' === 'preact') {
+            // Create the jsx function
+            var jsxFunc = function(type, props, key) {
+              if (key !== undefined && props) {
+                props.key = key;
+              }
+              return window.React.createElement(type, props);
+            };
+
+            var runtime = {
+              jsx: jsxFunc,
+              jsxs: jsxFunc,
+              jsxDEV: jsxFunc,
+              Fragment: window.React.Fragment
+            };
+
+            // Apply to all possible React references
+            window.React.jsx = jsxFunc;
+            window.React.jsxs = jsxFunc;
+            window.React.jsxDEV = jsxFunc;
+            window.React.Fragment = Symbol.for('react.fragment');
+
+            if (window.React.default) {
+              window.React.default.jsx = jsxFunc;
+              window.React.default.jsxs = jsxFunc;
+              window.React.default.jsxDEV = jsxFunc;
+              window.React.default.Fragment = window.React.Fragment;
+            }
+
+            window.jsx = jsxFunc;
+            window.jsxs = jsxFunc;
+            window.jsxRuntime = runtime;
+            window.ReactJsxRuntime = runtime;
+
+            if (typeof define !== 'undefined' && define.amd) {
+              define('react/jsx-runtime', [], function() {
+                return runtime;
+              });
+              define('react/jsx-dev-runtime', [], function() {
+                return runtime;
+              });
+            }
+
+            if (!window.__MODULE_CACHE__) {
+              window.__MODULE_CACHE__ = {};
+            }
+            window.__MODULE_CACHE__['react/jsx-runtime'] = runtime;
+            window.__MODULE_CACHE__['react/jsx-dev-runtime'] = runtime;
+            window.__MODULE_CACHE__['react'] = window.React;
+
+            // Create lightweight path shim for artifacts relying on Node's path module
+            if (!window.__SANDBOX_PATH_MODULE__) {
+              var pathShim = (function() {
+                var pathModule = {};
+                var normalize = function(pathStr) {
+                  return (pathStr || '').replace(/\\\\/g, '/');
+                };
+                pathModule.sep = '/';
+                pathModule.delimiter = ':';
+                pathModule.extname = function(pathStr) {
+                  pathStr = normalize(pathStr).split('/').pop() || '';
+                  var match = pathStr.match(/(\\.[^.\\/?#]+)(?:[?#]|$)/);
+                  return match ? match[1] : '';
+                };
+                pathModule.basename = function(pathStr, ext) {
+                  pathStr = normalize(pathStr).split('/').pop() || '';
+                  if (ext && pathStr.endsWith(ext)) {
+                    return pathStr.slice(0, -ext.length);
+                  }
+                  return pathStr;
+                };
+                pathModule.dirname = function(pathStr) {
+                  var parts = normalize(pathStr).split('/');
+                  parts.pop();
+                  var dir = parts.join('/');
+                  return dir || '.';
+                };
+                pathModule.join = function() {
+                  return normalize(Array.prototype.join.call(arguments, '/').replace(/\\/+/g, '/'));
+                };
+                pathModule.resolve = function() {
+                  return pathModule.join.apply(null, arguments);
+                };
+                pathModule.normalize = normalize;
+                pathModule.posix = pathModule;
+                pathModule.win32 = pathModule;
+                pathModule.default = pathModule;
+                return pathModule;
+              })();
+              window.__SANDBOX_PATH_MODULE__ = pathShim;
+            }
+
+            if (!window.__SANDBOX_REQUIRE__) {
+              window.__SANDBOX_REQUIRE__ = true;
+              var originalRequire = typeof window.require === 'function' ? window.require : null;
+              window.require = function(moduleName) {
+                if (moduleName === 'react/jsx-runtime' || moduleName === 'react/jsx-dev-runtime') {
+                  return window.jsxRuntime;
+                }
+                if (moduleName === 'path') {
+                  return window.__SANDBOX_PATH_MODULE__;
+                }
+                if (originalRequire) {
+                  try {
+                    return originalRequire(moduleName);
+                  } catch (err) {
+                    console.warn('[Sandbox] Failed to load module via original require:', moduleName, err);
+                  }
+                }
+                console.warn('[Sandbox] Module request not supported:', moduleName);
+                return {};
+              };
+            }
+
+            console.log('[Sandbox] JSX runtime polyfill installed successfully');
+          }
+          
+          // Mark framework as ready
+          window.__FRAMEWORK_READY__ = true;
+          return; // SUCCESS - Exit immediately
+        }
+        
+        // Busy wait 10ms (synchronous)
+        attempts++;
+        var start = Date.now();
+        while (Date.now() - start < 10) {
+          // Busy wait
+        }
+      }
+      
+      // FATAL: React failed to load after timeout
+      console.error('[Sandbox] FATAL: React failed to load within timeout');
+      window.__FRAMEWORK_READY__ = false;
+    })();
+  </script>
+
+  <!-- STEP 3: Load ReactFlow and other libraries (NOW React.jsx exists!) -->
   ${SHARED_LIBRARIES.scripts.map(src => `<script src="${src}"></script>`).join('\n  ')}
   ${SHARED_LIBRARIES.styles.map(href => `<link rel="stylesheet" href="${href}" />`).join('\n  ')}
 
@@ -164,43 +315,32 @@ export function UniversalArtifactViewer({
   
   <script>
     (function() {
-      console.log('[Sandbox] Starting initialization for ${framework}');
+      console.log('[Sandbox] Starting final initialization for ${framework}');
       
-      // Wait for all framework dependencies to load
+      // Wait for all libraries to load (ReactFlow, Lucide, etc.)
       var checkInterval = setInterval(function() {
         var isReady = false;
         
-        // Check if framework is loaded
+        // Check if framework is loaded and JSX runtime is ready
         if ('${framework}' === 'react' || '${framework}' === 'preact') {
-          if (typeof window.React !== 'undefined' && window.React && 
-              typeof window.ReactDOM !== 'undefined' && window.ReactDOM) {
+          if (window.__FRAMEWORK_READY__ && typeof window.React !== 'undefined' && window.React && 
+              typeof window.ReactDOM !== 'undefined' && window.ReactDOM && window.React.jsx) {
             
-            // Install JSX runtime polyfill
-            if (!window.React.jsx) {
-              window.React.jsx = function(type, props, key) {
-                if (key !== undefined && props) { props.key = key; }
-                return window.React.createElement(type, props);
-              };
-              window.React.jsxs = window.React.jsx;
-              window.React.jsxDEV = window.React.jsx;
-              window.React.Fragment = Symbol.for('react.fragment');
-              console.log('[Sandbox] JSX runtime polyfill installed');
-            }
-            
-            // Check if ReactFlow loaded
+            // Setup ReactFlow globals (if loaded)
             if (window.ReactFlow) {
-              // Setup ReactFlow globals
               var rf = window.ReactFlow;
               Object.keys(rf).forEach(function(key) {
                 if (!window[key] && key !== 'default') {
                   window[key] = rf[key];
                 }
               });
+              console.log('[Sandbox] ReactFlow globals configured');
             }
             
             // Setup Lucide
             if (window.lucide) {
               window.LucideReact = window.lucide;
+              console.log('[Sandbox] Lucide configured');
             }
             
             // Setup clsx
@@ -227,7 +367,7 @@ export function UniversalArtifactViewer({
         
         if (isReady) {
           clearInterval(checkInterval);
-          console.log('[Sandbox] Framework ready, signaling parent');
+          console.log('[Sandbox] All libraries loaded, framework ready, signaling parent');
           
           // Signal parent that sandbox is ready
           window.parent.postMessage({ 
@@ -388,13 +528,11 @@ export function UniversalArtifactViewer({
 
     if (iframeRef.current) {
       const sandboxHTML = generateSandboxHTML(metadata.framework)
-      const blob = new Blob([sandboxHTML], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      iframeRef.current.src = url
-
-      return () => URL.revokeObjectURL(url)
+      // Use srcdoc instead of blob URL for CSP compliance
+      iframeRef.current.srcdoc = sandboxHTML
+      // Clear any existing src attribute
+      iframeRef.current.removeAttribute('src')
     }
-    return undefined
   }, [code, metadata.framework, generateSandboxHTML])
 
   /**
@@ -409,10 +547,10 @@ export function UniversalArtifactViewer({
     // Re-initialize sandbox
     if (iframeRef.current) {
       const sandboxHTML = generateSandboxHTML(metadata.framework)
-      const blob = new Blob([sandboxHTML], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      iframeRef.current.src = url
-      setTimeout(() => URL.revokeObjectURL(url), 100)
+      // Use srcdoc instead of blob URL for CSP compliance
+      iframeRef.current.srcdoc = sandboxHTML
+      // Clear any existing src attribute
+      iframeRef.current.removeAttribute('src')
     }
   }, [metadata.framework, generateSandboxHTML])
 

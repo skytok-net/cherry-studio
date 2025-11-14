@@ -215,37 +215,46 @@ class LoggerService {
         moduleString = ` [${colorText(source.window || '', 'UNDERLINE')}::${colorText(source.module || '', 'UNDERLINE')}] `
       }
 
-      switch (level) {
-        case LEVEL.ERROR:
-          console.error(
-            `${datetimeColored} ${colorText(colorText('<ERROR>', 'RED'), 'BOLD')}${moduleString}${message}`,
-            ...meta
-          )
-          break
-        case LEVEL.WARN:
-          console.warn(
-            `${datetimeColored} ${colorText(colorText('<WARN>', 'YELLOW'), 'BOLD')}${moduleString}${message}`,
-            ...meta
-          )
-          break
-        case LEVEL.INFO:
-          console.info(
-            `${datetimeColored} ${colorText(colorText('<INFO>', 'GREEN'), 'BOLD')}${moduleString}${message}`,
-            ...meta
-          )
-          break
-        case LEVEL.DEBUG:
-          console.debug(
-            `${datetimeColored} ${colorText(colorText('<DEBUG>', 'BLUE'), 'BOLD')}${moduleString}${message}`,
-            ...meta
-          )
-          break
-        case LEVEL.VERBOSE:
-          console.log(`${datetimeColored} ${colorText('<VERBOSE>', 'BOLD')}${moduleString}${message}`, ...meta)
-          break
-        case LEVEL.SILLY:
-          console.log(`${datetimeColored} ${colorText('<SILLY>', 'BOLD')}${moduleString}${message}`, ...meta)
-          break
+      try {
+        switch (level) {
+          case LEVEL.ERROR:
+            console.error(
+              `${datetimeColored} ${colorText(colorText('<ERROR>', 'RED'), 'BOLD')}${moduleString}${message}`,
+              ...meta
+            )
+            break
+          case LEVEL.WARN:
+            console.warn(
+              `${datetimeColored} ${colorText(colorText('<WARN>', 'YELLOW'), 'BOLD')}${moduleString}${message}`,
+              ...meta
+            )
+            break
+          case LEVEL.INFO:
+            console.info(
+              `${datetimeColored} ${colorText(colorText('<INFO>', 'GREEN'), 'BOLD')}${moduleString}${message}`,
+              ...meta
+            )
+            break
+          case LEVEL.DEBUG:
+            console.debug(
+              `${datetimeColored} ${colorText(colorText('<DEBUG>', 'BLUE'), 'BOLD')}${moduleString}${message}`,
+              ...meta
+            )
+            break
+          case LEVEL.VERBOSE:
+            console.log(`${datetimeColored} ${colorText('<VERBOSE>', 'BOLD')}${moduleString}${message}`, ...meta)
+            break
+          case LEVEL.SILLY:
+            console.log(`${datetimeColored} ${colorText('<SILLY>', 'BOLD')}${moduleString}${message}`, ...meta)
+            break
+        }
+      } catch (error) {
+        // Silently ignore EPIPE and other stream errors when stdout/stderr is closed
+        // File logging will continue to work regardless
+        if ((error as any)?.code !== 'EPIPE') {
+          // Only report non-EPIPE errors to the winston error handler
+          this.logger.emit('error', new Error(`Console output failed: ${(error as Error).message}`))
+        }
       }
     }
 

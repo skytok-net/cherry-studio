@@ -169,18 +169,13 @@ export const makeNetworkRequest = createAsyncThunk(
       })
     )
 
-    try {
-      // Update status to executing
-      dispatch(updateRequestStatus({ id: request.id, status: 'executing' }))
+    // Update status to executing
+    dispatch(updateRequestStatus({ id: request.id, status: 'executing' }))
 
-      // Make the actual request
-      const response = await window.networkApi.makeRequest(request)
+    // Make the actual request
+    const response = await window.networkApi.makeRequest(request)
 
-      return { requestId: request.id, response }
-    } catch (error) {
-      // Error will be handled in rejected case
-      throw error
-    }
+    return { requestId: request.id, response }
   }
 )
 

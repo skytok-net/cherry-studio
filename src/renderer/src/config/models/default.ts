@@ -1005,6 +1005,18 @@ export const SYSTEM_MODELS: Record<SystemProviderId | 'defaultModel', Model[]> =
       provider: 'minimax',
       name: 'minimax-01',
       group: 'minimax-01'
+    },
+    {
+      id: 'MiniMax-M2',
+      provider: 'minimax',
+      name: 'MiniMax M2',
+      group: 'minimax-m2'
+    },
+    {
+      id: 'MiniMax-M2-Stable',
+      provider: 'minimax',
+      name: 'MiniMax M2 Stable',
+      group: 'minimax-m2'
     }
   ],
   hyperbolic: [

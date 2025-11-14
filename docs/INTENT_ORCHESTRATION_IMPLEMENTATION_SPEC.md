@@ -86,7 +86,7 @@ export interface OrchestrationModelConfig {
 
 export interface SettingsState {
   // ... existing fields ...
-  
+
   /** Search orchestration configuration */
   orchestrationModel: OrchestrationModelConfig
 }
@@ -97,7 +97,7 @@ Add to `initialState`:
 ```typescript
 const initialState: SettingsState = {
   // ... existing fields ...
-  
+
   orchestrationModel: {
     enabled: false, // Default to disabled for backward compatibility
     model: null,
@@ -183,9 +183,9 @@ export function getOrchestrationModel(
         modelId: config.model.id,
         providerId: provider.id
       })
-      
+
       const aiSdkModel = createModelInstance(config.model, provider)
-      
+
       return {
         model: aiSdkModel,
         metadata: config.model,
@@ -211,9 +211,9 @@ export function getOrchestrationModel(
         modelId: assistantModel.id,
         providerId: provider.id
       })
-      
+
       const aiSdkModel = createModelInstance(assistantModel, provider)
-      
+
       return {
         model: aiSdkModel,
         metadata: assistantModel,
@@ -246,7 +246,7 @@ export function getOrchestrationModel(
 function createModelInstance(model: Model, provider: Provider): LanguageModel {
   // This is a simplified version - actual implementation needs to handle
   // all provider types that Cherry Studio supports
-  
+
   switch (provider.id) {
     case 'openai':
     case 'openrouter':
@@ -254,18 +254,18 @@ function createModelInstance(model: Model, provider: Provider): LanguageModel {
         apiKey: provider.apiKey,
         baseURL: provider.apiHost
       })(model.id)
-    
+
     case 'anthropic':
       return createAnthropic({
         apiKey: provider.apiKey
       })(model.id)
-    
+
     case 'google':
     case 'google-vertex':
       return createGoogleGenerativeAI({
         apiKey: provider.apiKey
       })(model.id)
-    
+
     // Add more providers as needed
     default:
       logger.error('Unsupported provider for orchestration', { providerId: provider.id })
@@ -458,7 +458,7 @@ import type { Model } from '@renderer/types'
 export default function OrchestrationSettings() {
   const { t } = useTranslation()
   const dispatch = useAppDispatch()
-  
+
   const config = useAppSelector((state) => state.settings.orchestrationModel)
   const providers = getProviders()
   const recommendedModels = getRecommendedOrchestrationModels()
@@ -737,12 +737,12 @@ const orchestrationMetricsSlice = createSlice({
   reducers: {
     addMetric: (state, action: PayloadAction<OrchestrationMetric>) => {
       state.metrics.push(action.payload)
-      
+
       // Keep only last N metrics
       if (state.metrics.length > state.maxMetrics) {
         state.metrics = state.metrics.slice(-state.maxMetrics)
       }
-      
+
       // Update summary
       updateSummary(state)
     },
@@ -755,28 +755,28 @@ const orchestrationMetricsSlice = createSlice({
 
 function updateSummary(state: OrchestrationMetricsState) {
   const metrics = state.metrics
-  
+
   state.summary.totalQueries = metrics.length
   state.summary.orchestrationUsed = metrics.filter(m => m.source === 'orchestration').length
   state.summary.assistantFallbackUsed = metrics.filter(m => m.source === 'assistant').length
   state.summary.alwaysOnFallbackUsed = metrics.filter(m => m.source === 'fallback').length
-  
+
   const successfulMetrics = metrics.filter(m => m.success)
-  state.summary.successRate = metrics.length > 0 
-    ? (successfulMetrics.length / metrics.length) * 100 
+  state.summary.successRate = metrics.length > 0
+    ? (successfulMetrics.length / metrics.length) * 100
     : 0
-  
+
   const latencies = metrics
     .filter(m => m.intentAnalysisLatencyMs !== null)
     .map(m => m.intentAnalysisLatencyMs!)
-  
+
   state.summary.avgIntentAnalysisLatencyMs = latencies.length > 0
     ? latencies.reduce((a, b) => a + b, 0) / latencies.length
     : 0
-  
+
   // Estimate cost savings (simplified calculation)
   // Assume $0.04 per retrieval operation, 40% of queries don't need retrieval
-  state.summary.costSavingsEstimate = 
+  state.summary.costSavingsEstimate =
     state.summary.orchestrationUsed * 0.4 * 0.04
 }
 
@@ -803,7 +803,7 @@ export default function OrchestrationMetrics() {
   const recentMetrics = metrics.metrics.slice(-10).reverse()
 
   return (
-    <Card 
+    <Card
       title={t('settings.orchestration.metrics.title')}
       extra={
         <Button size="small" onClick={() => dispatch(clearMetrics())}>
@@ -856,8 +856,8 @@ export default function OrchestrationMetrics() {
             <span>{t('settings.orchestration.metrics.orchestrationModel')}</span>
             <span>{metrics.summary.orchestrationUsed} ({metrics.summary.totalQueries > 0 ? ((metrics.summary.orchestrationUsed / metrics.summary.totalQueries) * 100).toFixed(0) : 0}%)</span>
           </div>
-          <Progress 
-            percent={metrics.summary.totalQueries > 0 ? (metrics.summary.orchestrationUsed / metrics.summary.totalQueries) * 100 : 0} 
+          <Progress
+            percent={metrics.summary.totalQueries > 0 ? (metrics.summary.orchestrationUsed / metrics.summary.totalQueries) * 100 : 0}
             strokeColor="#52c41a"
             showInfo={false}
           />
@@ -867,8 +867,8 @@ export default function OrchestrationMetrics() {
             <span>{t('settings.orchestration.metrics.assistantFallback')}</span>
             <span>{metrics.summary.assistantFallbackUsed} ({metrics.summary.totalQueries > 0 ? ((metrics.summary.assistantFallbackUsed / metrics.summary.totalQueries) * 100).toFixed(0) : 0}%)</span>
           </div>
-          <Progress 
-            percent={metrics.summary.totalQueries > 0 ? (metrics.summary.assistantFallbackUsed / metrics.summary.totalQueries) * 100 : 0} 
+          <Progress
+            percent={metrics.summary.totalQueries > 0 ? (metrics.summary.assistantFallbackUsed / metrics.summary.totalQueries) * 100 : 0}
             strokeColor="#faad14"
             showInfo={false}
           />
@@ -878,8 +878,8 @@ export default function OrchestrationMetrics() {
             <span>{t('settings.orchestration.metrics.alwaysOnFallback')}</span>
             <span>{metrics.summary.alwaysOnFallbackUsed} ({metrics.summary.totalQueries > 0 ? ((metrics.summary.alwaysOnFallbackUsed / metrics.summary.totalQueries) * 100).toFixed(0) : 0}%)</span>
           </div>
-          <Progress 
-            percent={metrics.summary.totalQueries > 0 ? (metrics.summary.alwaysOnFallbackUsed / metrics.summary.totalQueries) * 100 : 0} 
+          <Progress
+            percent={metrics.summary.totalQueries > 0 ? (metrics.summary.alwaysOnFallbackUsed / metrics.summary.totalQueries) * 100 : 0}
             strokeColor="#ff4d4f"
             showInfo={false}
           />
@@ -939,7 +939,7 @@ import { addMetric } from '@renderer/store/orchestrationMetrics'
 const startTime = Date.now()
 try {
   // ... existing logic ...
-  
+
   // On success:
   store.dispatch(addMetric({
     timestamp: Date.now(),
@@ -1257,15 +1257,15 @@ Add JSDoc comments to all public functions:
 ```typescript
 /**
  * Get the appropriate model for orchestration intent analysis.
- * 
+ *
  * Implements fallback hierarchy:
  * 1. Dedicated orchestration model (if configured and valid)
  * 2. Assistant's model (if fallback enabled and valid)
  * 3. Skip intent analysis (use always-on retrieval)
- * 
+ *
  * @param assistantModel - The model configured for the assistant
  * @returns OrchestrationModelResult with model to use and metadata
- * 
+ *
  * @example
  * ```typescript
  * const result = getOrchestrationModel(assistant.model)

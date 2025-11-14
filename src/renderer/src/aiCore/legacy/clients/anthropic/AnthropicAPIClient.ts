@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk'
+import { MessageStream } from '@anthropic-ai/sdk/lib/MessageStream'
 import type {
   Base64ImageSource,
   ImageBlockParam,
@@ -22,7 +23,6 @@ import type {
   WebSearchToolResultBlockParam,
   WebSearchToolResultError
 } from '@anthropic-ai/sdk/resources/messages'
-import { MessageStream } from '@anthropic-ai/sdk/resources/messages/messages'
 import type AnthropicVertex from '@anthropic-ai/vertex-sdk'
 import { loggerService } from '@logger'
 import { DEFAULT_MAX_TOKENS } from '@renderer/config/constant'
