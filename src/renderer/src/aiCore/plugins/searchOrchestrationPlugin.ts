@@ -119,7 +119,13 @@ async function analyzeSearchIntent(
   const provider = getProviderByModel(model)
 
   if (!provider || isEmpty(provider.apiKey)) {
-    logger.error('Provider not found or missing API key')
+    logger.warn('Intent analysis skipped: Provider missing or no API key configured', {
+      modelId: model?.id,
+      providerId: provider?.id || 'unknown',
+      hasProvider: !!provider,
+      hasApiKey: provider ? !isEmpty(provider.apiKey) : false,
+      fallbackBehavior: 'Using direct user message as search query'
+    })
     return getFallbackResult()
   }
   try {

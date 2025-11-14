@@ -6,12 +6,92 @@
 import { loggerService } from '@logger'
 import { dbService } from '@renderer/services/db'
 import type { Message, MessageBlock } from '@renderer/types/newMessage'
+import { AssistantMessageStatus, MessageBlockStatus } from '@renderer/types/newMessage'
 
 import type { AppDispatch, RootState } from '../index'
 import { upsertManyBlocks } from '../messageBlock'
 import { newMessagesActions } from '../newMessage'
 
 const logger = loggerService.withContext('MessageThunkV2')
+
+/**
+ * Cleans up orphaned streaming/processing blocks that were left in intermediate states
+ * when the app was closed or crashed. This prevents UI from getting stuck in "Thinking" mode.
+ */
+function cleanupOrphanedStreamingBlocks(
+  blocks: MessageBlock[],
+  messages: Message[]
+): {
+  cleanedBlocks: MessageBlock[]
+  cleanedMessages: Message[]
+  updatedBlockIds: string[]
+} {
+  const orphanedBlockIds = new Set<string>()
+  const cleanedBlocks: MessageBlock[] = []
+
+  // Identify and fix blocks in intermediate states
+  for (const block of blocks) {
+    if (block.status === MessageBlockStatus.STREAMING || block.status === MessageBlockStatus.PROCESSING) {
+      // Mark as orphaned
+      orphanedBlockIds.add(block.id)
+
+      // Determine appropriate final status
+      // If block has content, consider it successful; otherwise mark as error
+      const hasContent = 'content' in block && block.content && String(block.content).trim().length > 0
+      const finalStatus = hasContent ? MessageBlockStatus.SUCCESS : MessageBlockStatus.ERROR
+
+      cleanedBlocks.push({
+        ...block,
+        status: finalStatus,
+        updatedAt: new Date().toISOString()
+      })
+
+      logger.info(`Cleaned up orphaned ${block.type} block ${block.id} from ${block.status} to ${finalStatus}`, {
+        blockId: block.id,
+        messageId: block.messageId,
+        originalStatus: block.status,
+        newStatus: finalStatus,
+        hasContent
+      })
+    } else {
+      cleanedBlocks.push(block)
+    }
+  }
+
+  // Update associated messages if they're in processing state
+  const cleanedMessages: Message[] = []
+  for (const message of messages) {
+    if (message.status === AssistantMessageStatus.PROCESSING || message.status === AssistantMessageStatus.PENDING) {
+      // Check if any of this message's blocks were orphaned
+      const hasOrphanedBlocks = message.blocks?.some((blockId) => orphanedBlockIds.has(blockId))
+
+      if (hasOrphanedBlocks) {
+        // Check if message has any content in its blocks
+        const messageBlocks = cleanedBlocks.filter((b) => message.blocks?.includes(b.id))
+        const hasContent = messageBlocks.some((b) => 'content' in b && b.content && String(b.content).trim().length > 0)
+
+        cleanedMessages.push({
+          ...message,
+          status: hasContent ? AssistantMessageStatus.SUCCESS : AssistantMessageStatus.ERROR
+        })
+
+        logger.info(
+          `Updated message ${message.id} status from ${message.status} to ${hasContent ? 'success' : 'error'}`
+        )
+      } else {
+        cleanedMessages.push(message)
+      }
+    } else {
+      cleanedMessages.push(message)
+    }
+  }
+
+  return {
+    cleanedBlocks,
+    cleanedMessages,
+    updatedBlockIds: Array.from(orphanedBlockIds)
+  }
+}
 
 // =================================================================
 // Phase 2.1 - Batch 1: Read-only operations (lowest risk)
@@ -45,11 +125,36 @@ export const loadTopicMessagesThunkV2 =
         blockCount: blocks.length
       })
 
-      // Update Redux state with fetched data
-      if (blocks.length > 0) {
-        dispatch(upsertManyBlocks(blocks))
+      // Clean up orphaned streaming/processing blocks from previous sessions
+      const { cleanedBlocks, cleanedMessages, updatedBlockIds } = cleanupOrphanedStreamingBlocks(blocks, messages)
+
+      // Persist cleaned blocks back to database if any were updated
+      if (updatedBlockIds.length > 0) {
+        try {
+          await dbService.updateBlocks(cleanedBlocks.filter((b) => updatedBlockIds.includes(b.id)))
+
+          // Also update any affected messages
+          for (const message of cleanedMessages) {
+            if (message.blocks?.some((blockId) => updatedBlockIds.includes(blockId))) {
+              await dbService.updateMessage(topicId, message.id, { status: message.status })
+            }
+          }
+
+          logger.info(`Persisted cleanup of ${updatedBlockIds.length} orphaned blocks to database`, {
+            topicId,
+            updatedBlockIds
+          })
+        } catch (persistError) {
+          logger.error('Failed to persist block cleanup to database:', persistError as Error)
+          // Continue anyway - Redux state will still be updated
+        }
       }
-      dispatch(newMessagesActions.messagesReceived({ topicId, messages }))
+
+      // Update Redux state with cleaned data
+      if (cleanedBlocks.length > 0) {
+        dispatch(upsertManyBlocks(cleanedBlocks))
+      }
+      dispatch(newMessagesActions.messagesReceived({ topicId, messages: cleanedMessages }))
     } catch (error) {
       logger.error(`Failed to load messages for topic ${topicId}:`, error as Error)
       // Could dispatch an error action here if needed
