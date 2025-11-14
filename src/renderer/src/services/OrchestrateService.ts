@@ -74,12 +74,13 @@ export async function transformMessagesAndFetch(
   try {
     const { modelMessages, uiMessages } = await ConversationService.prepareMessagesForModel(messages, assistant)
 
-    // replace prompt variables
-    assistant.prompt = await replacePromptVariables(assistant.prompt, assistant.model?.name)
+    // replace prompt variables - create new assistant object to avoid mutating read-only properties
+    const processedPrompt = await replacePromptVariables(assistant.prompt, assistant.model?.name)
+    const assistantWithProcessedPrompt = { ...assistant, prompt: processedPrompt }
 
     await fetchChatCompletion({
       messages: modelMessages,
-      assistant: assistant,
+      assistant: assistantWithProcessedPrompt,
       options: request.options,
       onChunkReceived,
       topicId: request.topicId,

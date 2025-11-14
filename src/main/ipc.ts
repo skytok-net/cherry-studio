@@ -33,6 +33,9 @@ import { PluginService } from './services/agents/plugins/PluginService'
 import { apiServerService } from './services/ApiServerService'
 import appService from './services/AppService'
 import AppUpdater from './services/AppUpdater'
+import { artifactRetryService } from './services/ArtifactRetryService'
+import type { TranspileRequest } from './services/ArtifactTranspilerService'
+import { artifactTranspilerService } from './services/ArtifactTranspilerService'
 import BackupManager from './services/BackupManager'
 import { codeToolsService } from './services/CodeToolsService'
 import { configManager } from './services/ConfigManager'
@@ -187,6 +190,82 @@ export function registerIpc(mainWindow: BrowserWindow, app: Electron.App) {
   ipcMain.handle(IpcChannel.App_Reload, () => mainWindow.reload())
   ipcMain.handle(IpcChannel.App_Quit, () => app.quit())
   ipcMain.handle(IpcChannel.Open_Website, (_, url: string) => shell.openExternal(url))
+
+  // Artifact Transpiler - Convert TSX/JSX to JavaScript for preview with auto-retry
+  ipcMain.handle('transpile-artifact', async (_, request: TranspileRequest & { 
+    enableRetry?: boolean
+    conversationHistory?: string[]
+  }) => {
+    try {
+      const result = await artifactTranspilerService.transpile(request)
+      return { 
+        success: true, 
+        data: result,
+        retries: 0 
+      }
+    } catch (error) {
+      logger.error('Artifact transpilation failed:', error as Error)
+      
+      const transpileError = {
+        message: error && typeof error === 'object' && 'message' in error 
+          ? (error as { message: string }).message 
+          : String(error),
+        location: error && typeof error === 'object' && 'location' in error 
+          ? (error as any).location 
+          : undefined
+      }
+      
+      // Attempt retry if enabled (default: true)
+      const enableRetry = request.enableRetry !== false
+      if (enableRetry) {
+        logger.info('Attempting auto-retry with LLM fix...')
+        
+        try {
+          const retryResult = await artifactRetryService.retryWithFix(
+            request,
+            transpileError,
+            {
+              conversationHistory: request.conversationHistory || [],
+              attemptNumber: 1
+            }
+          )
+          
+          if (retryResult.success && retryResult.transpiledCode) {
+            return {
+              success: true,
+              data: {
+                code: retryResult.transpiledCode,
+                map: undefined,
+                warnings: []
+              },
+              retries: retryResult.attempts,
+              fixStrategy: retryResult.fixStrategy
+            }
+          }
+          
+          // Retry failed, return original error
+          logger.warn(`Auto-retry failed after ${retryResult.attempts} attempts`)
+          return {
+            success: false,
+            error: retryResult.error || transpileError,
+            retries: retryResult.attempts,
+            fixStrategy: retryResult.fixStrategy
+          }
+          
+        } catch (retryError) {
+          logger.error('Retry service failed:', retryError as Error)
+          // Fall through to return original error
+        }
+      }
+      
+      // Return original error (no retry or retry disabled)
+      return {
+        success: false,
+        error: transpileError,
+        retries: 0
+      }
+    }
+  })
 
   // Update
   ipcMain.handle(IpcChannel.App_QuitAndInstall, () => appUpdater.quitAndInstall())

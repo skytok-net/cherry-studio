@@ -1043,6 +1043,17 @@
     "working_directory": "Working Directory"
   },
   "code_block": {
+    "ai_assistant": {
+      "placeholder": "Describe changes you want to make to this artifact...",
+      "send": "Send",
+      "thinking": "Thinking...",
+      "title": "Artifact Editor Assistant",
+      "toggle": "AI Assistant"
+    },
+    "ai_wizard": {
+      "button": "AI Fix",
+      "tooltip": "Request AI to automatically fix errors or improve the code"
+    },
     "collapse": "Collapse",
     "copy": {
       "failed": "Copy failed",
@@ -1076,6 +1087,7 @@
     "expand": "Expand",
     "more": "More",
     "run": "Run",
+    "run_tooltip": "Re-render the artifact (useful after manual code edits)",
     "split": {
       "label": "Split View",
       "restore": "Restore Split View"

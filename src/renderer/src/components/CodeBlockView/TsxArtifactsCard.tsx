@@ -20,6 +20,7 @@ interface Props {
   onSave?: (tsx: string) => void
   isStreaming?: boolean
   blockId?: string // Message block ID for context
+  language?: string // Framework language (tsx, jsx, svelte, vue, solid, preact)
 }
 
 const getTerminalStyles = (theme: ThemeMode) => ({
@@ -28,9 +29,21 @@ const getTerminalStyles = (theme: ThemeMode) => ({
   promptColor: theme === 'dark' ? '#00ff00' : '#007700'
 })
 
-const TsxArtifactsCard: FC<Props> = ({ tsx, onSave, isStreaming = false, blockId }) => {
+const TsxArtifactsCard: FC<Props> = ({ tsx, onSave, isStreaming = false, blockId, language = 'tsx' }) => {
   const { t } = useTranslation()
-  const title = extractComponentName(tsx) || 'React Component'
+  
+  // Get framework name for display
+  const frameworkNames: Record<string, string> = {
+    'tsx': 'React',
+    'jsx': 'React',
+    'svelte': 'Svelte',
+    'vue': 'Vue',
+    'solid': 'Solid',
+    'preact': 'Preact'
+  }
+  const frameworkName = frameworkNames[language.toLowerCase()] || 'React'
+  const title = extractComponentName(tsx) || `${frameworkName} Component`
+  
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const { theme } = useTheme()
 
@@ -66,7 +79,7 @@ const TsxArtifactsCard: FC<Props> = ({ tsx, onSave, isStreaming = false, blockId
             <Title>{title}</Title>
             <TypeBadge>
               <Code size={12} />
-              <span>TSX</span>
+              <span>{language.toUpperCase()}</span>
             </TypeBadge>
           </TitleSection>
         </Header>
@@ -118,6 +131,7 @@ const TsxArtifactsCard: FC<Props> = ({ tsx, onSave, isStreaming = false, blockId
         onSave={onSave}
         onClose={() => setIsPopupOpen(false)}
         blockId={blockId}
+        language={language}
       />
     </>
   )

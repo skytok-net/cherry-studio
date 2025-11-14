@@ -49,7 +49,10 @@ const CodeBlock: React.FC<Props> = ({ children, className, node, blockId }) => {
         const isOpenFence = isOpenFenceBlock(children?.length, languageMatch?.[1]?.length, node?.position)
         return <HtmlArtifactsCard html={children} onSave={handleSave} isStreaming={isStreaming && isOpenFence} />
       }
-      if (language === 'tsx' || language === 'jsx') {
+      
+      // Universal artifact support for all frameworks
+      const artifactLanguages = ['tsx', 'jsx', 'svelte', 'vue', 'solid', 'preact']
+      if (artifactLanguages.includes(language)) {
         const isOpenFence = isOpenFenceBlock(children?.length, languageMatch?.[1]?.length, node?.position)
         return (
           <TsxArtifactsCard
@@ -57,6 +60,7 @@ const CodeBlock: React.FC<Props> = ({ children, className, node, blockId }) => {
             onSave={handleSave}
             isStreaming={isStreaming && isOpenFence}
             blockId={blockId}
+            language={language}
           />
         )
       }

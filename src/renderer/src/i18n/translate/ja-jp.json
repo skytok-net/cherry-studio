@@ -1043,6 +1043,17 @@
     "working_directory": "作業ディレクトリ"
   },
   "code_block": {
+    "ai_assistant": {
+      "placeholder": "[to be translated]:Describe changes you want to make to this artifact...",
+      "send": "[to be translated]:Send",
+      "thinking": "[to be translated]:Thinking...",
+      "title": "[to be translated]:Artifact Editor Assistant",
+      "toggle": "[to be translated]:AI Assistant"
+    },
+    "ai_wizard": {
+      "button": "[to be translated]:AI Fix",
+      "tooltip": "[to be translated]:Request AI to automatically fix errors or improve the code"
+    },
     "collapse": "折りたたむ",
     "copy": {
       "failed": "コピーに失敗しました",
@@ -1076,6 +1087,7 @@
     "expand": "展開する",
     "more": "もっと",
     "run": "コードを実行",
+    "run_tooltip": "[to be translated]:Re-render the artifact (useful after manual code edits)",
     "split": {
       "label": "分割視圖",
       "restore": "分割視圖を解除"

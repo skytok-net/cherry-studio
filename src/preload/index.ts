@@ -570,7 +570,15 @@ const api = {
     status: () => ipcRenderer.invoke(IpcChannel.WebSocket_Status),
     sendFile: (filePath: string) => ipcRenderer.invoke(IpcChannel.WebSocket_SendFile, filePath),
     getAllCandidates: () => ipcRenderer.invoke(IpcChannel.WebSocket_GetAllCandidates)
-  }
+  },
+  // Artifact Transpiler - Fast server-side TSX/JSX to JavaScript conversion
+  transpileArtifact: (request: {
+    code: string
+    framework: 'react' | 'svelte' | 'vue' | 'solid' | 'preact'
+    language: 'typescript' | 'javascript'
+    filename?: string
+  }) =>
+    ipcRenderer.invoke('transpile-artifact', request)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
