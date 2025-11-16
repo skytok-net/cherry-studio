@@ -1,5 +1,5 @@
 import { constants as fsConstants, createWriteStream } from 'node:fs'
-import { access, chmod, copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { access, chmod, copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { pipeline } from 'node:stream/promises'
@@ -83,23 +83,22 @@ const GLOBAL_IMPORT_MAP: Record<string, string> = {
 export class ArtifactTranspilerService {
   private isInitialized = false
   private esbuildImpl: typeof esbuildNative = esbuildNative
-  private isUsingWasm = false
 
   private static readonly ESBUILD_PACKAGES: Record<EsbuildSupportedPlatform, Record<string, string>> = {
     darwin: {
       arm64: 'esbuild-darwin-arm64',
-      x64: 'esbuild-darwin-64'
+      x64: 'esbuild-darwin-x64'
     },
     linux: {
       arm64: 'esbuild-linux-arm64',
       arm: 'esbuild-linux-arm',
-      ia32: 'esbuild-linux-32',
-      x64: 'esbuild-linux-64'
+      ia32: 'esbuild-linux-ia32',
+      x64: 'esbuild-linux-x64'
     },
     win32: {
       arm64: 'esbuild-windows-arm64',
-      ia32: 'esbuild-windows-32',
-      x64: 'esbuild-windows-64'
+      ia32: 'esbuild-windows-ia32',
+      x64: 'esbuild-windows-x64'
     },
     freebsd: {
       arm64: 'esbuild-freebsd-arm64',
@@ -133,33 +132,48 @@ export class ArtifactTranspilerService {
       await this.ensureDiskSpace()
       await this.ensureEsbuildBinary()
 
+      // Test native esbuild
       try {
         await this.esbuildImpl.transform('let __esbuild_probe__ = 1', { loader: 'js' })
         logger.info(`Native esbuild initialized successfully (version ${this.esbuildImpl.version})`)
       } catch (nativeError) {
-        logger.warn('Native esbuild unavailable, attempting wasm fallback...', nativeError as Error)
+        // Native esbuild failed - try to download/ensure binary is available
+        logger.warn('Native esbuild probe failed, attempting to ensure binary is available...', nativeError as Error)
+        
+        // Try to ensure binary one more time
+        await this.ensureEsbuildBinary()
+        
+        // Retry the probe
         try {
-          await this.initializeWasmFallback()
-          await this.esbuildImpl.transform('let __esbuild_wasm_probe__ = 1', { loader: 'js' })
-          logger.info(`esbuild-wasm fallback initialized successfully (version ${this.esbuildImpl.version})`)
-        } catch (wasmError) {
-          logger.error('Both native and wasm esbuild failed to initialize', {
-            nativeError: nativeError as Error,
-            wasmError: wasmError as Error,
-            isPackaged: app.isPackaged,
+          await this.esbuildImpl.transform('let __esbuild_probe__ = 1', { loader: 'js' })
+          logger.info(`Native esbuild initialized successfully after retry (version ${this.esbuildImpl.version})`)
+        } catch (retryError) {
+          logger.error('Native esbuild failed to initialize after retry', {
+            originalError: nativeError as Error,
+            retryError: retryError as Error,
+            isPackaged: app && app.isPackaged ? app.isPackaged : false,
             esbuildBinaryPath: process.env.ESBUILD_BINARY_PATH,
             platform: process.platform,
-            arch: process.arch
+            arch: process.arch,
+            resourcesPath: process.resourcesPath
           })
-          throw wasmError
+          
+          // Provide helpful error message
+          const errorDetails = [
+            `Platform: ${process.platform}/${process.arch}`,
+            `Packaged: ${app && app.isPackaged ? app.isPackaged : false}`,
+            `ESBUILD_BINARY_PATH: ${process.env.ESBUILD_BINARY_PATH || 'not set'}`,
+            `Resources path: ${process.resourcesPath}`
+          ].join(', ')
+          
+          throw new Error(
+            `Failed to initialize native esbuild. ${errorDetails}. ` +
+            `Ensure esbuild binary is unpacked in electron-builder.yml and ESBUILD_BINARY_PATH is set correctly.`
+          )
         }
       }
 
-      logger.info(
-        `esbuild initialized (version ${this.esbuildImpl.version}${
-          this.isUsingWasm ? ' - wasm fallback' : ''
-        })`
-      )
+      logger.info(`esbuild initialized (version ${this.esbuildImpl.version})`)
 
       this.isInitialized = true
     } catch (error) {
@@ -169,10 +183,11 @@ export class ArtifactTranspilerService {
         message: errorMessage,
         stack: errorStack,
         error: error,
-        isPackaged: app.isPackaged,
+        isPackaged: app && app.isPackaged ? app.isPackaged : false,
         platform: process.platform,
         arch: process.arch,
-        esbuildBinaryPath: process.env.ESBUILD_BINARY_PATH
+        esbuildBinaryPath: process.env.ESBUILD_BINARY_PATH,
+        resourcesPath: process.resourcesPath
       })
       throw new Error(`Failed to initialize transpiler service: ${errorMessage}`)
     }
@@ -183,7 +198,7 @@ export class ArtifactTranspilerService {
    */
   private async ensureDiskSpace(): Promise<void> {
     try {
-      const targetPath = app.isPackaged ? process.resourcesPath : process.cwd()
+      const targetPath = (app && app.isPackaged) ? process.resourcesPath : process.cwd()
       const info = await checkDiskSpace(targetPath)
       const freeGB = info.free / (1024 ** 3)
       if (freeGB < 0.5) {
@@ -203,11 +218,12 @@ export class ArtifactTranspilerService {
   }
 
   private async ensureEsbuildBinary(): Promise<void> {
-    if (!app.isPackaged) {
+    if (!app || !app.isPackaged) {
       delete process.env.ESBUILD_BINARY_PATH
       return
     }
 
+    // Try 1: Check generic esbuild binary in unpacked directory
     const bundledPath = this.getBundledBinaryPath()
     if (await this.isExecutable(bundledPath)) {
       process.env.ESBUILD_BINARY_PATH = bundledPath
@@ -215,7 +231,26 @@ export class ArtifactTranspilerService {
       return
     }
 
+    // Try 2: Check platform-specific esbuild package in unpacked directory
     const packageName = this.getPlatformPackageName()
+    if (packageName) {
+      const platformSpecificPath = join(
+        process.resourcesPath,
+        'app.asar.unpacked',
+        'node_modules',
+        packageName,
+        'bin',
+        this.getBinaryFilename()
+      )
+      
+      if (await this.isExecutable(platformSpecificPath)) {
+        process.env.ESBUILD_BINARY_PATH = platformSpecificPath
+        logger.info(`[ArtifactTranspilerService] Using platform-specific esbuild binary at ${platformSpecificPath}`)
+        return
+      }
+    }
+
+    // Try 3: Download to userData as fallback
     if (!packageName) {
       logger.warn(
         `[ArtifactTranspilerService] No esbuild binary package mapping for ${process.platform}/${process.arch}`
@@ -228,7 +263,15 @@ export class ArtifactTranspilerService {
       logger.warn(
         `[ArtifactTranspilerService] Bundled esbuild binary missing. Downloading fallback for ${packageName}...`
       )
-      await this.downloadAndExtractEsbuild(packageName, fallbackPath)
+      try {
+        await this.downloadAndExtractEsbuild(packageName, fallbackPath)
+      } catch (downloadError) {
+        logger.error('Failed to download esbuild binary:', downloadError as Error)
+        throw new Error(
+          `Failed to download esbuild binary for ${packageName}. ` +
+          `Ensure esbuild packages are unpacked in electron-builder.yml or network access is available.`
+        )
+      }
     }
 
     process.env.ESBUILD_BINARY_PATH = fallbackPath
@@ -329,50 +372,6 @@ export class ArtifactTranspilerService {
 
       download(url)
     })
-  }
-
-  private async initializeWasmFallback(): Promise<void> {
-    try {
-      const esbuildWasm = (await import('esbuild-wasm')) as typeof import('esbuild-wasm')
-      const wasmPath = app.isPackaged
-        ? join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'esbuild-wasm', 'esbuild.wasm')
-        : require.resolve('esbuild-wasm/esbuild.wasm')
-      
-      // Check if WASM file exists
-      try {
-        await access(wasmPath)
-      } catch (accessError) {
-        logger.error('esbuild-wasm file not found:', {
-          wasmPath,
-          isPackaged: app.isPackaged,
-          resourcesPath: process.resourcesPath,
-          error: accessError as Error
-        })
-        throw new Error(`esbuild-wasm file not found at ${wasmPath}. Ensure esbuild-wasm is unpacked in electron-builder.yml`)
-      }
-      
-      // In Node.js, esbuild-wasm expects a filesystem path
-      const wasmBinary = await readFile(wasmPath)
-
-      await (esbuildWasm as any).initialize({
-        wasmBinary,
-        worker: false
-      })
-      
-      this.esbuildImpl = esbuildWasm as unknown as typeof esbuildNative
-      this.isUsingWasm = true
-
-      logger.warn('Using esbuild-wasm fallback. Artifact transpilation may be slower.')
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.error('Failed to initialize esbuild-wasm fallback:', {
-        message: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
-        isPackaged: app.isPackaged,
-        resourcesPath: process.resourcesPath
-      })
-      throw new Error(`Failed to initialize esbuild-wasm: ${errorMessage}`)
-    }
   }
 
   /**
@@ -586,8 +585,8 @@ export class ArtifactTranspilerService {
       plugins: [
         sveltePlugin({
           compilerOptions: {
-            css: true,
-            generate: 'dom'
+            css: 'injected',
+            generate: 'client'
           }
         })
       ]
@@ -678,34 +677,37 @@ export class ArtifactTranspilerService {
 
     try {
       const hasJsx = this.containsLikelyJsx(request.code)
-      // Step 1: Pre-process imports
-      const processedCode = this.preprocessImports(request.code)
-
+      
       logger.debug('Transpiling artifact:', {
         framework: request.framework,
         language: request.language,
         codeLength: request.code.length
       })
 
+      // Step 1: Pre-process imports (only for React/Preact/Solid - Svelte/Vue handle imports themselves)
       // Step 2: Transpile with appropriate handler
       let result: TranspileResult
 
       switch (request.framework) {
         case 'react':
         case 'preact': // Preact uses same JSX syntax
-          result = await this.transpileReact(processedCode, request.language, hasJsx)
+          const processedReactCode = this.preprocessImports(request.code)
+          result = await this.transpileReact(processedReactCode, request.language, hasJsx)
           break
 
         case 'svelte':
-          result = await this.transpileSvelte(processedCode)
+          // Svelte compiler handles imports internally - don't preprocess
+          result = await this.transpileSvelte(request.code)
           break
 
         case 'vue':
-          result = await this.transpileVue(processedCode)
+          // Vue compiler handles imports internally - don't preprocess
+          result = await this.transpileVue(request.code)
           break
 
         case 'solid':
-          result = await this.transpileSolid(processedCode)
+          const processedSolidCode = this.preprocessImports(request.code)
+          result = await this.transpileSolid(processedSolidCode)
           break
 
         default:
@@ -731,11 +733,18 @@ export class ArtifactTranspilerService {
         const firstError = esbuildError.errors[0]
 
         if (firstError) {
+          // Determine default filename based on framework
+          const defaultFilename = 
+            request.framework === 'svelte' ? 'Component.svelte' :
+            request.framework === 'vue' ? 'Component.vue' :
+            request.framework === 'solid' ? 'Component.tsx' :
+            `Component.${request.language === 'typescript' ? 'tsx' : 'jsx'}`
+          
           const transpileError: TranspileError = {
             message: firstError.text,
             location: firstError.location
               ? {
-                  file: request.filename || 'Component.tsx',
+                  file: request.filename || defaultFilename,
                   line: firstError.location.line,
                   column: firstError.location.column,
                   lineText: firstError.location.lineText,

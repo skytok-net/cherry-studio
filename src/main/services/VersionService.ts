@@ -75,7 +75,7 @@ class VersionService {
    * @returns {Packaged} Packaging status
    */
   private getPackagedStatus(): Packaged {
-    return app.isPackaged ? 'packaged' : 'unpackaged'
+    return (app && app.isPackaged) ? 'packaged' : 'unpackaged'
   }
 
   /**

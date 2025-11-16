@@ -471,7 +471,7 @@ export class PluginService {
    */
   private getPluginsBasePath(): string {
     // Use the utility function which handles both dev and production correctly
-    if (app.isPackaged) {
+    if (app && app.isPackaged) {
       return path.join(process.resourcesPath, 'claude-code-plugins')
     }
     return path.join(__dirname, '../../node_modules/claude-code-plugins/plugins')

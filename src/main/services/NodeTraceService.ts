@@ -1,5 +1,6 @@
 import { loggerService } from '@logger'
 import { isDev } from '@main/constant'
+import { getPreloadPath } from '@main/utils'
 import { CacheBatchSpanProcessor, FunctionSpanExporter } from '@mcp-trace/trace-core'
 import { NodeTracer as MCPNodeTracer } from '@mcp-trace/trace-node/nodeTracer'
 import type { SpanContext } from '@opentelemetry/api'
@@ -78,7 +79,7 @@ export function openTraceWindow(topicId: string, traceId: string, autoOpen = tru
     frame: true,
     titleBarOverlay: { height: 40 },
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,

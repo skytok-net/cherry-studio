@@ -35,15 +35,28 @@ export enum ConfigKeys {
 }
 
 export class ConfigManager {
-  private store: Store
+  private store: Store | null = null
   private subscribers: Map<string, Array<(newValue: any) => void>> = new Map()
 
   constructor() {
-    this.store = new Store()
+    // Defer store initialization until first access
+  }
+
+  private initializeStore() {
+    if (!this.store) {
+      this.store = new Store({
+        name: 'com.kangfenmao.CherryStudio'
+      })
+    }
   }
 
   getLanguage(): LanguageVarious {
-    const locale = Object.keys(locales).includes(app.getLocale()) ? app.getLocale() : defaultLanguage
+    // Use default language if app is not ready
+    let locale = defaultLanguage
+    if (app && app.getLocale) {
+      const appLocale = app.getLocale()
+      locale = Object.keys(locales).includes(appLocale) ? appLocale : defaultLanguage
+    }
     return this.get(ConfigKeys.Language, locale) as LanguageVarious
   }
 
@@ -257,12 +270,14 @@ export class ConfigManager {
   }
 
   set(key: string, value: unknown, isNotify: boolean = false) {
-    this.store.set(key, value)
+    this.initializeStore()
+    this.store!.set(key, value)
     isNotify && this.notifySubscribers(key, value)
   }
 
   get<T>(key: string, defaultValue?: T) {
-    return this.store.get(key, defaultValue) as T
+    this.initializeStore()
+    return this.store!.get(key, defaultValue) as T
   }
 }
 

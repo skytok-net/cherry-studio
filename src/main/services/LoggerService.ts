@@ -3,6 +3,7 @@ import type { LogContextData, LogLevel, LogSourceWithContext } from '@shared/con
 import { LEVEL, LEVEL_MAP } from '@shared/config/logger'
 import { IpcChannel } from '@shared/IpcChannel'
 import { app, ipcMain } from 'electron'
+import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import winston from 'winston'
@@ -38,7 +39,12 @@ const SYSTEM_INFO = {
   os: `${os.platform()}-${os.arch()} / ${os.version()}`,
   hw: `${os.cpus()[0]?.model || 'Unknown CPU'} / ${(os.totalmem() / 1024 / 1024 / 1024).toFixed(2)}GB`
 }
-const APP_VERSION = `${app?.getVersion?.() || 'unknown'}`
+/**
+ * Get app version safely - only when needed and after app is ready
+ */
+function getAppVersion(): string {
+  return app && typeof app.getVersion === 'function' ? app.getVersion() : 'unknown'
+}
 
 const DEFAULT_LEVEL = isDev ? LEVEL.SILLY : LEVEL.INFO
 
@@ -66,8 +72,8 @@ class LoggerService {
       throw new Error('[LoggerService] NOT support worker thread yet, can only be instantiated in main process.')
     }
 
-    // Create logs directory path
-    this.logsDir = path.join(app.getPath('userData'), 'logs')
+    // Initialize logs directory path - will be set when app is ready
+    this.logsDir = ''
 
     // env variables, only used in dev mode
     // only affect console output, not affect file output
@@ -97,31 +103,8 @@ class LoggerService {
       }
     }
 
-    // Configure transports based on environment
-    const transports: winston.transport[] = []
-
-    // Daily rotate file transport for general logs
-    transports.push(
-      new DailyRotateFile({
-        filename: path.join(this.logsDir, 'app.%DATE%.log'),
-        datePattern: 'YYYY-MM-DD',
-        maxSize: '10m',
-        maxFiles: '30d'
-      })
-    )
-
-    // Daily rotate file transport for error logs
-    transports.push(
-      new DailyRotateFile({
-        level: 'warn',
-        filename: path.join(this.logsDir, 'app-error.%DATE%.log'),
-        datePattern: 'YYYY-MM-DD',
-        maxSize: '10m',
-        maxFiles: '60d'
-      })
-    )
-
-    // Configure Winston logger
+    // Create basic logger without file transports initially
+    // File transports will be added after app is ready
     this.logger = winston.createLogger({
       // Development: all levels, Production: info and above
       level: DEFAULT_LEVEL,
@@ -133,7 +116,7 @@ class LoggerService {
         winston.format.json()
       ),
       exitOnError: false,
-      transports
+      transports: [] // Start with no transports, will be added in initializeFileLogging
     })
 
     // Handle transport events
@@ -141,8 +124,8 @@ class LoggerService {
       console.error('LoggerService fatal error:', error)
     })
 
-    //register ipc handler, for renderer process to log to main process
-    this.registerIpcHandler()
+    // IPC handler registration will be done after app is ready
+    // Call registerIpcHandler() manually after electron app is ready
   }
 
   /**
@@ -153,6 +136,58 @@ class LoggerService {
       LoggerService.instance = new LoggerService()
     }
     return LoggerService.instance
+  }
+
+  /**
+   * Initialize file logging after app is ready
+   * This must be called after the Electron app is ready and app.getPath() is available
+   */
+  public initializeFileLogging(): void {
+    if (!app || !app.getPath) {
+      console.error('[LoggerService] Cannot initialize file logging: app.getPath not available')
+      return
+    }
+
+    try {
+      // Set the logs directory now that app is ready
+      this.logsDir = path.join(app.getPath('userData'), 'logs')
+
+      // Create logs directory if it doesn't exist
+      if (!fs.existsSync(this.logsDir)) {
+        fs.mkdirSync(this.logsDir, { recursive: true })
+      }
+
+      // Add file transports to the existing logger
+      const fileTransports = [
+        // Daily rotate file transport for general logs
+        new DailyRotateFile({
+          filename: path.join(this.logsDir, 'app.%DATE%.log'),
+          datePattern: 'YYYY-MM-DD',
+          maxSize: '10m',
+          maxFiles: '30d'
+        }),
+        // Daily rotate file transport for error logs
+        new DailyRotateFile({
+          level: 'warn',
+          filename: path.join(this.logsDir, 'app-error.%DATE%.log'),
+          datePattern: 'YYYY-MM-DD',
+          maxSize: '10m',
+          maxFiles: '60d'
+        })
+      ]
+
+      // Add the file transports to the existing logger
+      fileTransports.forEach(transport => {
+        this.logger.add(transport)
+      })
+
+      // Register IPC handler now that electron is ready
+      this.registerIpcHandler()
+
+      console.log(colorText(`[LoggerService] File logging initialized at: ${this.logsDir}`, 'GREEN'))
+    } catch (error) {
+      console.error('[LoggerService] Failed to initialize file logging:', error)
+    }
   }
 
   /**
@@ -273,7 +308,7 @@ class LoggerService {
     if (level === LEVEL.ERROR || level === LEVEL.WARN) {
       const extra = {
         sys: SYSTEM_INFO,
-        appver: APP_VERSION
+        appver: getAppVersion()
       }
 
       meta.push(extra)

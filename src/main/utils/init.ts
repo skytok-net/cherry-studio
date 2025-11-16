@@ -22,6 +22,12 @@ function getConfigDir() {
 }
 
 export function initAppDataDir() {
+  // Ensure app is available and ready before accessing app methods
+  if (!app || !app.setPath || !app.getPath) {
+    console.warn('initAppDataDir: Electron app not ready, skipping initialization')
+    return
+  }
+
   const appDataPath = getAppDataPathFromConfig()
   if (appDataPath) {
     app.setPath('userData', appDataPath)
@@ -37,6 +43,11 @@ export function initAppDataDir() {
 
 function getAppDataPathFromConfig() {
   try {
+    // Ensure app is available before accessing app methods
+    if (!app || !app.getPath) {
+      return null
+    }
+
     const configPath = path.join(getConfigDir(), 'config.json')
     if (!fs.existsSync(configPath)) {
       return null
@@ -82,6 +93,12 @@ function getAppDataPathFromConfig() {
 }
 
 export function updateAppDataConfig(appDataPath: string) {
+  // Ensure app is available before accessing app methods
+  if (!app || !app.getPath) {
+    console.warn('updateAppDataConfig: Electron app not ready, skipping config update')
+    return
+  }
+
   const configDir = getConfigDir()
   if (!fs.existsSync(configDir)) {
     fs.mkdirSync(configDir, { recursive: true })

@@ -1,8 +1,12 @@
 import fs from 'node:fs'
 import fsAsync from 'node:fs/promises'
 import path from 'node:path'
+import { existsSync } from 'node:fs'
 
 import { app } from 'electron'
+import { loggerService } from '@logger'
+
+const logger = loggerService.withContext('Utils')
 
 export function getResourcePath() {
   return path.join(app.getAppPath(), 'resources')
@@ -78,4 +82,36 @@ export const removeEnvProxy = (env: Record<string, string>) => {
   delete env.grpc_proxy
   delete env.http_proxy
   delete env.https_proxy
+}
+
+/**
+ * Get the preload script path, handling both dev and production environments
+ * This function tries multiple possible paths to find the preload script
+ */
+export function getPreloadPath(): string {
+  // Check if app is available and packaged
+  if (app && app.isPackaged) {
+    // In production, preload is in app.asar
+    return path.join(process.resourcesPath, 'app.asar', 'out', 'preload', 'index.js')
+  }
+
+  // In development, try multiple possible paths
+  // __dirname in main process will be 'out/main' after electron-vite build
+  const possiblePaths = [
+    path.join(__dirname, '../preload/index.js'), // Standard electron-vite output
+    path.join(process.cwd(), 'out', 'preload', 'index.js'), // Absolute from cwd
+    path.join(__dirname, '../../out/preload/index.js') // Alternative structure
+  ]
+
+  for (const preloadPath of possiblePaths) {
+    if (existsSync(preloadPath)) {
+      logger.debug(`Using preload path: ${preloadPath}`)
+      return preloadPath
+    }
+  }
+
+  // Fallback to standard path (will error if not found, but that's expected)
+  const fallbackPath = path.join(__dirname, '../preload/index.js')
+  logger.warn(`Preload script not found in any expected location, using fallback: ${fallbackPath}`)
+  return fallbackPath
 }

@@ -5,7 +5,6 @@ import { generateUserAgent } from '@main/utils/systemInfo'
 import { FeedUrl, UpdateConfigUrl, UpdateMirror, UpgradeChannel } from '@shared/config/constant'
 import { IpcChannel } from '@shared/IpcChannel'
 import type { UpdateInfo } from 'builder-util-runtime'
-import { CancellationToken } from 'builder-util-runtime'
 import { app, net } from 'electron'
 import type { AppUpdater as _AppUpdater, Logger, NsisUpdater, UpdateCheckResult } from 'electron-updater'
 import { autoUpdater } from 'electron-updater'
@@ -48,12 +47,11 @@ interface ChannelConfig {
 
 export default class AppUpdater {
   autoUpdater: _AppUpdater = autoUpdater
-  private cancellationToken: CancellationToken = new CancellationToken()
   private updateCheckResult: UpdateCheckResult | null = null
 
   constructor() {
     autoUpdater.logger = logger as Logger
-    autoUpdater.forceDevUpdateConfig = !app.isPackaged
+    autoUpdater.forceDevUpdateConfig = !(app && app.isPackaged !== undefined && app.isPackaged)
     autoUpdater.autoDownload = configManager.getAutoUpdate()
     autoUpdater.autoInstallOnAppQuit = configManager.getAutoUpdate()
     autoUpdater.requestHeaders = {
@@ -262,8 +260,6 @@ export default class AppUpdater {
   }
 
   public cancelDownload() {
-    this.cancellationToken.cancel()
-    this.cancellationToken = new CancellationToken()
     if (this.autoUpdater.autoDownload) {
       this.updateCheckResult?.cancellationToken?.cancel()
     }
@@ -288,8 +284,8 @@ export default class AppUpdater {
       if (this.updateCheckResult?.isUpdateAvailable && !this.autoUpdater.autoDownload) {
         // 如果 autoDownload 为 false，则需要再调用下面的函数触发下
         // do not use await, because it will block the return of this function
-        logger.info('downloadUpdate manual by check for updates', this.cancellationToken)
-        this.autoUpdater.downloadUpdate(this.cancellationToken)
+        logger.info('downloadUpdate manual by check for updates', this.updateCheckResult?.cancellationToken)
+        this.autoUpdater.downloadUpdate(this.updateCheckResult?.cancellationToken)
       }
 
       return {

@@ -16,7 +16,7 @@ PROBLEM:
   slows down simple queries.
 
 SOLUTION:
-  Add intelligent intent analysis using a dedicated lightweight model to 
+  Add intelligent intent analysis using a dedicated lightweight model to
   determine WHEN to search. Graceful fallback ensures system always works.
 
 IMPACT:
@@ -42,12 +42,12 @@ DOCUMENTATION CREATED
    Purpose: Master index and overview
    Audience: Everyone
    Length: 5 min read
-   
+
 2. ORCHESTRATION_QUICK_START.md
    Purpose: Implementation checklist and quick reference
    Audience: Developers implementing the feature
    Length: 10 min read
-   
+
 3. INTENT_ORCHESTRATION_IMPLEMENTATION_SPEC.md
    Purpose: Complete technical specification
    Audience: Tech leads, architects, developers
@@ -61,7 +61,7 @@ DOCUMENTATION CREATED
    - Migration & rollout plan
    - Performance benchmarks
    - Risk mitigation
-   
+
 4. ORCHESTRATION_ARCHITECTURE_DIAGRAM.md
    Purpose: Visual system architecture
    Audience: Everyone (visual learners)
@@ -141,21 +141,21 @@ COMPONENTS:
     - Settings Panel (OrchestrationSettings.tsx)
     - Metrics Dashboard (OrchestrationMetrics.tsx)
     - Model Selector Dropdown
-    
+
   State Management:
     - Redux Settings Slice (orchestrationModel config)
     - Redux Metrics Slice (runtime tracking, not persisted)
-    
+
   Service Layer:
     - OrchestrationService (model selection, fallback logic)
     - ProviderService (API key validation)
     - AssistantService (assistant model access)
-    
+
   Execution Layer:
     - SearchOrchestrationPlugin (intent analysis integration)
     - Intent Analysis (generateText with orchestration model)
     - Tool Selection (add web/KB/memory search based on intent)
-    
+
   Model Layer:
     - Orchestration Model (lightweight, cheap, fast)
     - Assistant Model (fallback)
@@ -194,7 +194,7 @@ CURRENT STATE (No Orchestration):
     - KB embedding: $0.01
     - Generation: $0.04
     - TOTAL: $0.08 per query
-  
+
   Daily (1000 queries): $80
   Monthly: $2,400
   Annually: $28,800
@@ -202,15 +202,15 @@ CURRENT STATE (No Orchestration):
 NEW STATE (With Orchestration):
   Every Query:
     - Intent analysis: $0.0002
-  
+
   60% need retrieval:
     - Intent + Retrieval + Generation: $0.08
     - Subtotal: 600 × $0.08 = $48
-  
+
   40% skip retrieval:
     - Intent + Generation: $0.04
     - Subtotal: 400 × $0.04 = $16
-  
+
   Daily: $64
   Monthly: $1,920
   Annually: $23,040

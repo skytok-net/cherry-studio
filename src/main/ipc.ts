@@ -159,7 +159,7 @@ export function registerIpc(mainWindow: BrowserWindow, app: Electron.App) {
 
   ipcMain.handle(IpcChannel.App_Info, () => ({
     version: app.getVersion(),
-    isPackaged: app.isPackaged,
+    isPackaged: app && app.isPackaged ? app.isPackaged : false,
     appPath: app.getAppPath(),
     filesPath: getFilesDir(),
     notesPath: getNotesDir(),

@@ -7,8 +7,23 @@ import { configManager } from './ConfigManager'
 
 class ThemeService {
   private theme: ThemeMode = ThemeMode.system
+  private isInitialized: boolean = false
+
   constructor() {
     this.theme = configManager.getTheme()
+
+    // Apply theme safely - defer if nativeTheme not available
+    this.safelyApplyTheme()
+  }
+
+  /**
+   * Safely apply theme - handles case when nativeTheme is not yet available
+   */
+  private safelyApplyTheme() {
+    // Check if nativeTheme is available
+    if (!nativeTheme || typeof nativeTheme.themeSource === 'undefined') {
+      return
+    }
 
     if (this.theme === ThemeMode.dark || this.theme === ThemeMode.light || this.theme === ThemeMode.system) {
       nativeTheme.themeSource = this.theme
@@ -17,10 +32,20 @@ class ThemeService {
       configManager.setTheme(ThemeMode.system)
       nativeTheme.themeSource = ThemeMode.system
     }
-    nativeTheme.on('updated', this.themeUpdatadHandler.bind(this))
+
+    // Only register listener once when nativeTheme is available
+    if (!this.isInitialized) {
+      nativeTheme.on('updated', this.themeUpdatadHandler.bind(this))
+      this.isInitialized = true
+    }
   }
 
   themeUpdatadHandler() {
+    // Guard against nativeTheme being undefined
+    if (!nativeTheme || typeof nativeTheme.shouldUseDarkColors === 'undefined') {
+      return
+    }
+
     BrowserWindow.getAllWindows().forEach((win) => {
       if (win && !win.isDestroyed() && win.setTitleBarOverlay) {
         try {
@@ -34,13 +59,26 @@ class ThemeService {
     })
   }
 
+  /**
+   * Initialize theme service after Electron is ready
+   * This should be called from main process after app is ready
+   */
+  public initialize() {
+    this.safelyApplyTheme()
+  }
+
   setTheme(theme: ThemeMode) {
     if (theme === this.theme) {
       return
     }
 
     this.theme = theme
-    nativeTheme.themeSource = theme
+
+    // Safely apply theme
+    if (nativeTheme && typeof nativeTheme.themeSource !== 'undefined') {
+      nativeTheme.themeSource = theme
+    }
+
     configManager.setTheme(theme)
   }
 }

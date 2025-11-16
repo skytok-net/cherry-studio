@@ -1,7 +1,7 @@
 // just import the themeService to ensure the theme is initialized
 import './ThemeService'
 
-import { is } from '@electron-toolkit/utils'
+// Removed @electron-toolkit/utils import to prevent timing issues with app.isPackaged
 import { loggerService } from '@logger'
 import { isDev, isLinux, isMac, isWin } from '@main/constant'
 import { getFilesDir } from '@main/utils/file'
@@ -13,6 +13,7 @@ import { join } from 'path'
 
 import icon from '../../../build/icon.png?asset'
 import { titleBarOverlayDark, titleBarOverlayLight } from '../config'
+import { getPreloadPath } from '@main/utils'
 import { configManager } from './ConfigManager'
 import { contextMenu } from './ContextMenu'
 import { initSessionUserAgent } from './WebviewService'
@@ -81,7 +82,7 @@ export class WindowService {
       darkTheme: nativeTheme.shouldUseDarkColors,
       ...(isLinux ? { icon } : {}),
       webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
+        preload: getPreloadPath(),
         sandbox: false,
         webSecurity: false,
         nodeIntegration: true,
@@ -169,7 +170,7 @@ export class WindowService {
     // Dangerous API
     if (isDev) {
       mainWindow.webContents.on('will-attach-webview', (_, webPreferences) => {
-        webPreferences.preload = join(__dirname, '../preload/index.js')
+        webPreferences.preload = getPreloadPath()
       })
     }
   }
@@ -326,7 +327,7 @@ export class WindowService {
   }
 
   private loadMainWindowContent(mainWindow: BrowserWindow) {
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    if (isDev && process.env['ELECTRON_RENDERER_URL']) {
       mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
       // mainWindow.webContents.openDevTools()
     } else {
@@ -506,7 +507,7 @@ export class WindowService {
       maximizable: false,
       fullscreenable: false,
       webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
+        preload: getPreloadPath(),
         sandbox: false,
         webSecurity: false,
         webviewTag: true
@@ -551,7 +552,7 @@ export class WindowService {
       this.miniWindow?.webContents.send(IpcChannel.ShowMiniWindow)
     })
 
-    if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    if (isDev && process.env['ELECTRON_RENDERER_URL']) {
       this.miniWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/miniWindow.html')
     } else {
       this.miniWindow.loadFile(join(__dirname, '../renderer/miniWindow.html'))

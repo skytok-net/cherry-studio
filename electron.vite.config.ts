@@ -103,9 +103,22 @@ export default defineConfig({
     optimizeDeps: {
       exclude: ['pyodide'],
       // Dedupe CodeMirror packages to prevent multiple instances
+      include: [
+        '@codemirror/state',
+        '@codemirror/view',
+        '@codemirror/language',
+        '@codemirror/lint',
+        'codemirror',
+        '@uiw/react-codemirror',
+        '@codesandbox/sandpack-react'
+      ]
     },
     worker: {
       format: 'es'
+    },
+    define: {
+      // Prevent path module externalization warnings in development
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
     },
     build: {
       target: 'esnext', // for build
@@ -129,11 +142,18 @@ export default defineConfig({
             if (id.includes('codemirror-lang-') || id.includes('@viz-js/lang-')) {
               return 'codemirror'
             }
+            // Group sandpack and related dependencies to prevent duplication
+            if (id.includes('@codesandbox/sandpack')) {
+              return 'sandpack'
+            }
             return undefined
           }
         },
         onwarn(warning, warn) {
           if (warning.code === 'COMMONJS_VARIABLE_IN_ESM') return
+          // Suppress path module externalization warnings - handled by sandbox shim
+          if (warning.message?.includes('Module "path" has been externalized')) return
+          if (warning.message?.includes('Cannot access "path.extname" in client code')) return
           warn(warning)
         }
       }

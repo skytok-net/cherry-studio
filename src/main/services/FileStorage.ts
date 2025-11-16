@@ -43,7 +43,7 @@ const getRipgrepBinaryPath = (): string | null => {
       process.platform === 'win32' ? 'rg.exe' : 'rg'
     )
 
-    if (app.isPackaged) {
+    if (app && app.isPackaged) {
       ripgrepBinaryPath = ripgrepBinaryPath.replace(/\.asar([\\/])/, '.asar.unpacked$1')
     }
 

@@ -1,6 +1,7 @@
 import { loggerService } from '@logger'
 import { SELECTION_FINETUNED_LIST, SELECTION_PREDEFINED_BLACKLIST } from '@main/configs/SelectionConfig'
 import { isDev, isMac, isWin } from '@main/constant'
+import { getPreloadPath } from '@main/utils'
 import { IpcChannel } from '@shared/IpcChannel'
 import { app, BrowserWindow, ipcMain, screen, systemPreferences } from 'electron'
 import { join } from 'path'
@@ -427,7 +428,7 @@ export class SelectionService {
       acceptFirstMouse: true, // [macOS only]
 
       webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
+        preload: getPreloadPath(),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: false,
@@ -1118,7 +1119,7 @@ export class SelectionService {
       thickFrame: false,
       show: false,
       webPreferences: {
-        preload: join(__dirname, '../preload/index.js'),
+        preload: getPreloadPath(),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,

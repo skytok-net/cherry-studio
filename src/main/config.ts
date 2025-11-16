@@ -3,11 +3,23 @@ import { app } from 'electron'
 
 import { getDataPath } from './utils'
 
-if (isDev) {
-  app.setPath('userData', app.getPath('userData') + 'Dev')
+// Initialize app configuration after Electron app is ready
+export function initializeAppConfig() {
+  if (isDev && app && app.setPath && app.getPath) {
+    try {
+      app.setPath('userData', app.getPath('userData') + 'Dev')
+    } catch (error) {
+      console.error('Failed to set development userData path:', error)
+    }
+  }
 }
 
-export const DATA_PATH = getDataPath()
+// DATA_PATH will be set after app is ready
+export let DATA_PATH: string = ''
+
+export function setDataPath() {
+  DATA_PATH = getDataPath()
+}
 
 export const titleBarOverlayDark = {
   height: 42,

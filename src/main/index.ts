@@ -1,12 +1,11 @@
 // don't reorder this file, it's used to initialize the app data dir and
 // other which should be run before the main process is ready
 // eslint-disable-next-line
-import './bootstrap'
+import { initializeAppDataDir, copyOccupiedDirsInMainProcess } from './bootstrap'
 
-import '@main/config'
+import { initializeAppConfig, setDataPath } from '@main/config'
 
 import { loggerService } from '@logger'
-import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { replaceDevtoolsFont } from '@main/utils/windowUtil'
 import { app } from 'electron'
 import installExtension, { REACT_DEVELOPER_TOOLS, REDUX_DEVTOOLS } from 'electron-devtools-installer'
@@ -121,13 +120,28 @@ if (!app.requestSingleInstanceLock()) {
   // Some APIs can only be used after this event occurs.
 
   app.whenReady().then(async () => {
+    // Initialize app configuration first (set development userData path)
+    initializeAppConfig()
+
+    // Initialize app data directory
+    initializeAppDataDir()
+
+    // Set data path after app config is initialized
+    setDataPath()
+
+    // Copy occupied directories if needed (Windows only)
+    copyOccupiedDirsInMainProcess()
+
+    // Initialize file logging after app is ready
+    loggerService.initializeFileLogging()
+
     // Record current version for tracking
     // A preparation for v2 data refactoring
     versionService.recordCurrentVersion()
 
     initWebviewHotkeys()
-    // Set app user model id for windows
-    electronApp.setAppUserModelId(import.meta.env.VITE_MAIN_BUNDLE_ID || 'com.kangfenmao.CherryStudio')
+    // Set app user model id for windows - using direct Electron API instead of @electron-toolkit/utils
+    app.setAppUserModelId(import.meta.env.VITE_MAIN_BUNDLE_ID || 'com.kangfenmao.CherryStudio')
 
     // Mac: Hide dock icon before window creation when launch to tray is set
     const isLaunchToTray = configManager.getLaunchToTray()
@@ -232,9 +246,11 @@ if (!app.requestSingleInstanceLock()) {
     handleOpenUrl(argv)
   })
 
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
+  // Removed optimizer.watchWindowShortcuts() to avoid @electron-toolkit/utils dependency
+  // This was used for window shortcuts optimization but is not critical for functionality
+  // app.on('browser-window-created', (_, window) => {
+  //   optimizer.watchWindowShortcuts(window)
+  // })
 
   app.on('before-quit', () => {
     app.isQuitting = true

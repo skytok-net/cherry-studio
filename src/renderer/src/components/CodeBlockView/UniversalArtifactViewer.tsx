@@ -354,11 +354,56 @@ export function UniversalArtifactViewer({
       throw new Error('require shim not working correctly');
     }
     
+    // CRITICAL: Add a small synchronous delay to ensure React's UMD bundle has fully executed
+    // This ensures all React properties are fully initialized before ReactFlow loads
+    var start = Date.now();
+    while (Date.now() - start < 5) {
+      // Busy wait 5ms to ensure React UMD bundle has fully executed
+    }
+    
+    // Double-check React is still available after delay
+    if (!window.React || !window.React.forwardRef) {
+      console.error('[Sandbox] FATAL: React.forwardRef not available after delay');
+      throw new Error('React not fully initialized');
+    }
+    
     console.log('[Sandbox] React confirmed ready with all APIs, loading shared libraries synchronously...');
   </script>
   
-  <!-- Load all shared libraries as inline scripts (they execute synchronously in order) -->
-  ${SHARED_LIBRARIES.inlineScripts.map(content => createScriptTag(content)).join('\n  ')}
+  <!-- Load ReactFlow FIRST (it's the most critical and needs React immediately) -->
+  <script>
+    // FINAL CHECK: Ensure React is available right before ReactFlow loads
+    if (!window.React || !window.React.forwardRef || !window.React.createElement) {
+      console.error('[Sandbox] FATAL: React not available right before ReactFlow load');
+      throw new Error('React not available for ReactFlow');
+    }
+    
+    // CRITICAL: Ensure React is available in all possible ways ReactFlow might access it
+    // ReactFlow's UMD bundle might check for React in multiple ways
+    if (typeof window.React === 'undefined') {
+      throw new Error('window.React is undefined before ReactFlow load');
+    }
+    if (typeof window.require === 'function') {
+      var reactFromRequire = window.require('react');
+      if (!reactFromRequire || reactFromRequire !== window.React) {
+        throw new Error('require("react") does not return correct React instance');
+      }
+    }
+    
+    console.log('[Sandbox] React verified available, loading ReactFlow...');
+  </script>
+  ${createScriptTag(reactFlowUmd)}
+  <script>
+    // Verify ReactFlow loaded correctly
+    if (!window.ReactFlow) {
+      console.error('[Sandbox] FATAL: ReactFlow failed to load');
+      throw new Error('ReactFlow failed to load');
+    }
+    console.log('[Sandbox] ReactFlow loaded successfully');
+  </script>
+  
+  <!-- Load other shared libraries -->
+  ${SHARED_LIBRARIES.inlineScripts.filter((_, idx) => idx !== 0).map(content => createScriptTag(content)).join('\n  ')}
   ${SHARED_LIBRARIES.inlineStyles.map(style => `<style>${style}</style>`).join('\n  ')}
   
   <script>
