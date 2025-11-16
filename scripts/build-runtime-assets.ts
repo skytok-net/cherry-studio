@@ -1,8 +1,9 @@
-import { mkdir, rm, writeFile, copyFile } from 'node:fs/promises'
+import { copyFile,mkdir, rm, writeFile } from 'node:fs/promises'
+import https from 'node:https'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import https from 'node:https'
 
+import type { Plugin } from 'esbuild'
 import { build } from 'esbuild'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -11,6 +12,22 @@ const outputDir = path.resolve(
   projectRoot,
   'src/renderer/src/components/CodeBlockView/runtimeAssets/generated'
 )
+const entriesDir = path.resolve(__dirname, 'runtime-assets', 'entries')
+const shimsDir = path.resolve(__dirname, 'runtime-assets', 'shims')
+const langchainRemoteShimPath = path.join(shimsDir, 'langchain-core-runnables-remote.ts')
+const langchainHashShimPath = path.join(shimsDir, 'langchain-core-utils-hash.ts')
+
+const createLangchainAliasPlugin = (): Plugin => ({
+  name: 'langchain-alias',
+  setup(build) {
+    build.onResolve({ filter: /^@langchain\/core\/runnables\/remote$/ }, () => ({
+      path: langchainRemoteShimPath
+    }))
+    build.onResolve({ filter: /^@langchain\/core(?:\/dist)?\/utils\/hash(?:\.js)?$/ }, () => ({
+      path: langchainHashShimPath
+    }))
+  }
+})
 
 const ensureDir = async () => {
   await rm(outputDir, { recursive: true, force: true })
@@ -37,6 +54,14 @@ const copyTargets = [
   {
     from: path.resolve(projectRoot, 'node_modules/clsx/dist/clsx.min.js'),
     to: path.join(outputDir, 'clsx.min.js')
+  },
+  {
+    from: path.resolve(projectRoot, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js'),
+    to: path.join(outputDir, 'supabase.js')
+  },
+  {
+    from: path.resolve(projectRoot, 'node_modules/axios/dist/axios.min.js'),
+    to: path.join(outputDir, 'axios.min.js')
   }
 ]
 
@@ -45,6 +70,8 @@ const bundleTargets: Array<{
   outfile: string
   globalName: string
   define?: Record<string, string>
+  external?: string[]
+  plugins?: Plugin[]
 }> = [
   {
     entry: 'preact/compat',
@@ -65,6 +92,39 @@ const bundleTargets: Array<{
     entry: 'class-variance-authority',
     outfile: path.join(outputDir, 'class-variance-authority.js'),
     globalName: 'ClassVarianceAuthorityBundle'
+  },
+  {
+    entry: path.join(entriesDir, 'langchain-runtime.ts'),
+    outfile: path.join(outputDir, 'langchain-runtime.js'),
+    globalName: 'LangChainRegistry',
+    external: ['@langchain/core/runnables/remote'],
+    plugins: [createLangchainAliasPlugin()]
+  },
+  {
+    entry: path.join(entriesDir, 'langgraph-runtime.ts'),
+    outfile: path.join(outputDir, 'langgraph-runtime.js'),
+    globalName: 'LangGraphRegistry'
+  },
+  {
+    entry: 'ai',
+    outfile: path.join(outputDir, 'vercel-ai-sdk.js'),
+    globalName: 'VercelAISDK'
+  },
+  {
+    entry: '@ai-sdk/react',
+    outfile: path.join(outputDir, 'vercel-ai-elements.js'),
+    globalName: 'VercelAIElements',
+    external: ['react', 'react-dom']
+  },
+  {
+    entry: '@ai-sdk/openai',
+    outfile: path.join(outputDir, 'vercel-ai-openai.js'),
+    globalName: 'VercelAIOpenAI'
+  },
+  {
+    entry: '@ai-sdk/anthropic',
+    outfile: path.join(outputDir, 'vercel-ai-anthropic.js'),
+    globalName: 'VercelAIAnthropic'
   }
 ]
 
@@ -106,15 +166,18 @@ async function bundleAssets() {
       entryPoints: [target.entry],
       outfile: target.outfile,
       bundle: true,
+      absWorkingDir: projectRoot,
       format: 'iife',
       globalName: target.globalName,
       platform: 'browser',
       target: ['es2019'],
+      external: target.external,
       define: {
         'process.env.NODE_ENV': '"production"',
-        ...(target.define ?? {})
+        ...target.define
       },
-      logLevel: 'silent'
+      logLevel: 'silent',
+      plugins: target.plugins
     })
     console.log(`Bundled ${target.entry} -> ${path.relative(projectRoot, target.outfile)}`)
   }

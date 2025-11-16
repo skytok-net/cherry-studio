@@ -38,6 +38,7 @@ export default defineConfig({
         formats: ['cjs']
       },
       rollupOptions: {
+        input: resolve(__dirname, 'src/main/index.ts'),
         external: ['bufferutil', 'utf-8-validate', 'electron', 'esbuild', ...Object.keys(pkg.dependencies)],
         output: {
           manualChunks: undefined, // 彻底禁用代码分割 - 返回 null 强制单文件打包

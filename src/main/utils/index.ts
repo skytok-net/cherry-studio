@@ -1,10 +1,10 @@
 import fs from 'node:fs'
+import { existsSync } from 'node:fs'
 import fsAsync from 'node:fs/promises'
 import path from 'node:path'
-import { existsSync } from 'node:fs'
 
-import { app } from 'electron'
 import { loggerService } from '@logger'
+import { app } from 'electron'
 
 const logger = loggerService.withContext('Utils')
 

@@ -4,18 +4,26 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 
+import axiosBundle from './runtimeAssets/generated/axios.min.js?raw'
+import cvaBundle from './runtimeAssets/generated/class-variance-authority.js?raw'
+import clsxUmd from './runtimeAssets/generated/clsx.min.js?raw'
+import langchainRegistryBundle from './runtimeAssets/generated/langchain-runtime.js?raw'
+import langgraphRegistryBundle from './runtimeAssets/generated/langgraph-runtime.js?raw'
+import lucideReactUmd from './runtimeAssets/generated/lucide-react.min.js?raw'
+import preactCompatBundle from './runtimeAssets/generated/preact-compat.js?raw'
+import reactUmd from './runtimeAssets/generated/react.dev.bundle.js?raw'
 import reactDomUmd from './runtimeAssets/generated/react-dom.dev.bundle.js?raw'
 import reactFlowCss from './runtimeAssets/generated/reactflow.css?raw'
-import reactFlowBaseCss from './runtimeAssets/generated/reactflow-base.css?raw'
 import reactFlowUmd from './runtimeAssets/generated/reactflow.umd.js?raw'
-import reactUmd from './runtimeAssets/generated/react.dev.bundle.js?raw'
-import lucideReactUmd from './runtimeAssets/generated/lucide-react.min.js?raw'
-import clsxUmd from './runtimeAssets/generated/clsx.min.js?raw'
+import reactFlowBaseCss from './runtimeAssets/generated/reactflow-base.css?raw'
+import solidRuntimeBundle from './runtimeAssets/generated/solid-runtime.js?raw'
+import supabaseBundle from './runtimeAssets/generated/supabase.js?raw'
 import tailwindCdnScript from './runtimeAssets/generated/tailwind-cdn.js?raw'
 import tailwindMergeBundle from './runtimeAssets/generated/tailwind-merge.js?raw'
-import cvaBundle from './runtimeAssets/generated/class-variance-authority.js?raw'
-import preactCompatBundle from './runtimeAssets/generated/preact-compat.js?raw'
-import solidRuntimeBundle from './runtimeAssets/generated/solid-runtime.js?raw'
+import vercelAiAnthropicBundle from './runtimeAssets/generated/vercel-ai-anthropic.js?raw'
+import vercelAiElementsBundle from './runtimeAssets/generated/vercel-ai-elements.js?raw'
+import vercelAiOpenAIBundle from './runtimeAssets/generated/vercel-ai-openai.js?raw'
+import vercelAiSdkBundle from './runtimeAssets/generated/vercel-ai-sdk.js?raw'
 
 const logger = loggerService.withContext('UniversalArtifactViewer')
 
@@ -87,7 +95,22 @@ const FRAMEWORK_RUNTIMES: Record<
 }
 
 const SHARED_LIBRARIES = {
-  inlineScripts: [reactFlowUmd, lucideReactUmd, clsxUmd, tailwindCdnScript, tailwindMergeBundle, cvaBundle],
+  inlineScripts: [
+    reactFlowUmd,
+    lucideReactUmd,
+    clsxUmd,
+    tailwindCdnScript,
+    tailwindMergeBundle,
+    cvaBundle,
+    supabaseBundle,
+    axiosBundle,
+    langchainRegistryBundle,
+    langgraphRegistryBundle,
+    vercelAiSdkBundle,
+    vercelAiElementsBundle,
+    vercelAiOpenAIBundle,
+    vercelAiAnthropicBundle
+  ],
   inlineStyles: [reactFlowCss, reactFlowBaseCss]
 }
 
@@ -135,6 +158,17 @@ export function UniversalArtifactViewer({
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${framework.toUpperCase()} Artifact Sandbox</title>
+
+  <script>
+    window.process = window.process || { env: {} };
+    window.process.env = Object.assign(
+      { NODE_ENV: 'production', NEXT_RUNTIME: 'electron-renderer' },
+      window.process.env || {}
+    );
+    if (!window.global) {
+      window.global = window;
+    }
+  </script>
 
   <!-- STEP 1: Load React and ReactDOM FIRST -->
   ${runtimeDeps.inlineScripts?.map(content => createScriptTag(content)).join('\n  ') ?? ''}
@@ -408,6 +442,24 @@ export function UniversalArtifactViewer({
   
   <script>
     console.log('[Sandbox] All shared libraries loaded successfully');
+    if (window.LangChainRegistry) {
+      window.LangChain = window.LangChainRegistry;
+    }
+    if (window.LangGraphRegistry) {
+      window.LangGraph = window.LangGraphRegistry;
+    }
+    if (window.VercelAISDK) {
+      window.AISDK = window.VercelAISDK;
+    }
+    if (window.VercelAIElements) {
+      window.AIElements = window.VercelAIElements;
+    }
+    if (window.VercelAIOpenAI) {
+      window.AISDKOpenAI = window.VercelAIOpenAI;
+    }
+    if (window.VercelAIAnthropic) {
+      window.AISDKAnthropic = window.VercelAIAnthropic;
+    }
   </script>
 
   <style>
@@ -625,7 +677,7 @@ export function UniversalArtifactViewer({
         })
 
         if (result.success) {
-          logger.info('Transpilation successful, executing in sandbox')
+          logger.info('[UniversalArtifactViewer] Transpilation successful, executing in sandbox')
           setLoadingMessage('Rendering component...')
           
           // Send code to iframe for execution
@@ -635,25 +687,25 @@ export function UniversalArtifactViewer({
           }, '*')
         } else {
           const errorMsg = result.error?.message || 'Transpilation failed'
-          logger.error('Transpilation failed:', errorMsg)
+          logger.error('[UniversalArtifactViewer] Transpilation failed:', errorMsg)
           setPreviewError(errorMsg)
           setIsLoading(false)
           onError?.(new Error(errorMsg))
         }
       } catch (error) {
-        logger.error('IPC transpilation error:', error as Error)
+        logger.error('[UniversalArtifactViewer] IPC transpilation error:', error as Error)
         setPreviewError((error as Error).message)
         setIsLoading(false)
         onError?.(error as Error)
       }
     } else if (type === 'RENDER_SUCCESS') {
-      logger.info('Component rendered successfully')
+      logger.info('[UniversalArtifactViewer] ✓ React component rendered')
       setIsLoading(false)
       setPreviewError(null)
       setRetryAttempt(0)
       onSuccess?.()
     } else if (type === 'RENDER_ERROR') {
-      logger.error('Component render error:', event.data.error)
+      logger.error('[UniversalArtifactViewer] ✗ React component render error:', event.data.error)
       setIsLoading(false)
       setPreviewError(event.data.error)
       onError?.(new Error(event.data.error))
