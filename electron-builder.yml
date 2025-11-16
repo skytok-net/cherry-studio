@@ -66,6 +66,10 @@ asarUnpack:
   - resources/**
   - "**/*.{metal,exp,lib}"
   - "node_modules/@img/sharp-libvips-*/**"
+  # Ensure native esbuild binary is available outside asar for ArtifactTranspilerService
+  - "node_modules/esbuild/**"
+  - "node_modules/esbuild-*/**"
+  - "node_modules/esbuild-wasm/**"
 
 # copy from node_modules/claude-code-plugins/plugins to resources/data/claude-code-pluginso
 extraResources:

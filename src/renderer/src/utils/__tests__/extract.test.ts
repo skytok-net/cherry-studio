@@ -116,15 +116,14 @@ describe('extract', () => {
         </websearch>
       `
 
-      // 注意：XMLParser 能够处理一些无效的 XML
       const result = extractInfoFromXML(invalidXml)
-      expect(result).toBeDefined()
+      expect(result).toBeNull()
     })
 
     it('should handle empty XML input', () => {
       // 注意：XMLParser 会尝试解析空字符串
       const result = extractInfoFromXML('')
-      expect(result).toEqual({})
+      expect(result).toBeNull()
     })
 
     it('should handle XML with empty tags', () => {

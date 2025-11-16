@@ -1,5 +1,21 @@
+import { constants as fsConstants, createWriteStream } from 'node:fs'
+import { access, chmod, copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, dirname } from 'node:path'
+import { pipeline } from 'node:stream/promises'
+import type { IncomingMessage } from 'node:http'
+import { request } from 'node:https'
+
 import { loggerService } from '@logger'
-import * as esbuild from 'esbuild'
+import checkDiskSpace from 'check-disk-space'
+import { app } from 'electron'
+import type { Loader, Message, TransformFailure } from 'esbuild'
+import * as esbuildNative from 'esbuild'
+import react18Plugin from 'esbuild-plugin-react18'
+import { solidPlugin } from 'esbuild-plugin-solid'
+import sveltePlugin from 'esbuild-svelte'
+import * as tar from 'tar'
+import vuePlugin from 'esbuild-plugin-vue3'
 
 const logger = loggerService.withContext('ArtifactTranspilerService')
 
@@ -24,7 +40,7 @@ export interface TranspileRequest {
 export interface TranspileResult {
   code: string
   map?: string
-  warnings?: esbuild.Message[]
+  warnings?: Message[]
 }
 
 /**
@@ -40,6 +56,11 @@ export interface TranspileError {
     suggestion?: string
   }
 }
+
+/**
+ * Supported platforms for esbuild binary packages
+ */
+type EsbuildSupportedPlatform = 'darwin' | 'linux' | 'win32' | 'freebsd' | 'openbsd' | 'netbsd' | 'aix' | 'android'
 
 /**
  * Global import mappings for artifact libraries
@@ -61,6 +82,44 @@ const GLOBAL_IMPORT_MAP: Record<string, string> = {
  */
 export class ArtifactTranspilerService {
   private isInitialized = false
+  private esbuildImpl: typeof esbuildNative = esbuildNative
+  private isUsingWasm = false
+
+  private static readonly ESBUILD_PACKAGES: Record<EsbuildSupportedPlatform, Record<string, string>> = {
+    darwin: {
+      arm64: 'esbuild-darwin-arm64',
+      x64: 'esbuild-darwin-64'
+    },
+    linux: {
+      arm64: 'esbuild-linux-arm64',
+      arm: 'esbuild-linux-arm',
+      ia32: 'esbuild-linux-32',
+      x64: 'esbuild-linux-64'
+    },
+    win32: {
+      arm64: 'esbuild-windows-arm64',
+      ia32: 'esbuild-windows-32',
+      x64: 'esbuild-windows-64'
+    },
+    freebsd: {
+      arm64: 'esbuild-freebsd-arm64',
+      x64: 'esbuild-freebsd-64'
+    },
+    openbsd: {
+      x64: 'esbuild-openbsd-64'
+    },
+    netbsd: {
+      x64: 'esbuild-netbsd-64'
+    },
+    aix: {
+      ppc64: 'esbuild-aix-ppc64'
+    },
+    android: {
+      arm64: 'esbuild-android-arm64',
+      arm: 'esbuild-android-arm',
+      x64: 'esbuild-android-64'
+    }
+  }
 
   /**
    * Initialize the service (esbuild is ready to use immediately)
@@ -71,14 +130,248 @@ export class ArtifactTranspilerService {
     }
 
     try {
-      // esbuild is ready to use immediately (no initialization needed)
-      // Just verify it's available
-      const version = esbuild.version
-      logger.info(`esbuild initialized (version ${version})`)
+      await this.ensureDiskSpace()
+      await this.ensureEsbuildBinary()
+
+      try {
+        await this.esbuildImpl.transform('let __esbuild_probe__ = 1', { loader: 'js' })
+        logger.info(`Native esbuild initialized successfully (version ${this.esbuildImpl.version})`)
+      } catch (nativeError) {
+        logger.warn('Native esbuild unavailable, attempting wasm fallback...', nativeError as Error)
+        try {
+          await this.initializeWasmFallback()
+          await this.esbuildImpl.transform('let __esbuild_wasm_probe__ = 1', { loader: 'js' })
+          logger.info(`esbuild-wasm fallback initialized successfully (version ${this.esbuildImpl.version})`)
+        } catch (wasmError) {
+          logger.error('Both native and wasm esbuild failed to initialize', {
+            nativeError: nativeError as Error,
+            wasmError: wasmError as Error,
+            isPackaged: app.isPackaged,
+            esbuildBinaryPath: process.env.ESBUILD_BINARY_PATH,
+            platform: process.platform,
+            arch: process.arch
+          })
+          throw wasmError
+        }
+      }
+
+      logger.info(
+        `esbuild initialized (version ${this.esbuildImpl.version}${
+          this.isUsingWasm ? ' - wasm fallback' : ''
+        })`
+      )
+
       this.isInitialized = true
     } catch (error) {
-      logger.error('Failed to initialize esbuild:', error as Error)
-      throw new Error('Failed to initialize transpiler service')
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorStack = error instanceof Error ? error.stack : undefined
+      logger.error('Failed to initialize esbuild:', {
+        message: errorMessage,
+        stack: errorStack,
+        error: error,
+        isPackaged: app.isPackaged,
+        platform: process.platform,
+        arch: process.arch,
+        esbuildBinaryPath: process.env.ESBUILD_BINARY_PATH
+      })
+      throw new Error(`Failed to initialize transpiler service: ${errorMessage}`)
+    }
+  }
+
+  /**
+   * Ensure there is enough free disk space for esbuild temp files
+   */
+  private async ensureDiskSpace(): Promise<void> {
+    try {
+      const targetPath = app.isPackaged ? process.resourcesPath : process.cwd()
+      const info = await checkDiskSpace(targetPath)
+      const freeGB = info.free / (1024 ** 3)
+      if (freeGB < 0.5) {
+        logger.warn(
+          `[ArtifactTranspilerService] Low disk space detected (${freeGB.toFixed(
+            2
+          )} GB free). Esbuild may fail if insufficient space is available.`
+        )
+      } else {
+        logger.info(
+          `[ArtifactTranspilerService] Disk space check OK (${freeGB.toFixed(2)} GB free at ${targetPath}).`
+        )
+      }
+    } catch (error) {
+      logger.warn('[ArtifactTranspilerService] Unable to determine disk space', error as Error)
+    }
+  }
+
+  private async ensureEsbuildBinary(): Promise<void> {
+    if (!app.isPackaged) {
+      delete process.env.ESBUILD_BINARY_PATH
+      return
+    }
+
+    const bundledPath = this.getBundledBinaryPath()
+    if (await this.isExecutable(bundledPath)) {
+      process.env.ESBUILD_BINARY_PATH = bundledPath
+      logger.info(`[ArtifactTranspilerService] Using bundled esbuild binary at ${bundledPath}`)
+      return
+    }
+
+    const packageName = this.getPlatformPackageName()
+    if (!packageName) {
+      logger.warn(
+        `[ArtifactTranspilerService] No esbuild binary package mapping for ${process.platform}/${process.arch}`
+      )
+      return
+    }
+
+    const fallbackPath = this.getUserDataBinaryPath(packageName)
+    if (!(await this.isExecutable(fallbackPath))) {
+      logger.warn(
+        `[ArtifactTranspilerService] Bundled esbuild binary missing. Downloading fallback for ${packageName}...`
+      )
+      await this.downloadAndExtractEsbuild(packageName, fallbackPath)
+    }
+
+    process.env.ESBUILD_BINARY_PATH = fallbackPath
+    logger.info(`[ArtifactTranspilerService] Using downloaded esbuild binary at ${fallbackPath}`)
+  }
+
+  private getPlatformPackageName(): string | undefined {
+    const platformMap =
+      ArtifactTranspilerService.ESBUILD_PACKAGES[process.platform as EsbuildSupportedPlatform]
+    return platformMap?.[process.arch]
+  }
+
+  private getBinaryFilename(): string {
+    return process.platform === 'win32' ? 'esbuild.exe' : 'esbuild'
+  }
+
+  private getBundledBinaryPath(): string {
+    return join(
+      process.resourcesPath,
+      'app.asar.unpacked',
+      'node_modules',
+      'esbuild',
+      'bin',
+      this.getBinaryFilename()
+    )
+  }
+
+  private getUserDataBinaryPath(packageName: string): string {
+    return join(
+      app.getPath('userData'),
+      'esbuild-bin',
+      esbuildNative.version,
+      packageName,
+      'bin',
+      this.getBinaryFilename()
+    )
+  }
+
+  private async isExecutable(path: string): Promise<boolean> {
+    try {
+      await access(path, fsConstants.X_OK)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async downloadAndExtractEsbuild(packageName: string, targetBinaryPath: string): Promise<void> {
+    const version = esbuildNative.version
+    const downloadUrl = `https://registry.npmjs.org/${packageName}/-/${packageName}-${version}.tgz`
+    const tempDir = await mkdtemp(join(tmpdir(), 'esbuild-download-'))
+    const archivePath = join(tempDir, `${packageName}-${version}.tgz`)
+
+    try {
+      await this.downloadFile(downloadUrl, archivePath)
+      await tar.x({ file: archivePath, cwd: tempDir })
+
+      const extractedBinary = join(tempDir, 'package', 'bin', this.getBinaryFilename())
+
+      await mkdir(dirname(targetBinaryPath), { recursive: true })
+      await copyFile(extractedBinary, targetBinaryPath)
+      await chmod(targetBinaryPath, 0o755)
+    } finally {
+      await rm(tempDir, { recursive: true, force: true })
+    }
+  }
+
+  private async downloadFile(url: string, destination: string): Promise<void> {
+    await mkdir(dirname(destination), { recursive: true })
+
+    await new Promise<void>((resolve, reject) => {
+      const download = (currentUrl: string, redirectCount = 0) => {
+        const req = request(currentUrl, (res: IncomingMessage) => {
+          const statusCode = res.statusCode ?? 0
+          if (statusCode >= 300 && statusCode < 400 && res.headers.location) {
+            if (redirectCount > 5) {
+              reject(new Error(`Too many redirects while downloading ${url}`))
+              return
+            }
+            const nextUrl = new URL(res.headers.location, currentUrl).toString()
+            download(nextUrl, redirectCount + 1)
+            req.destroy()
+            return
+          }
+
+          if (statusCode !== 200) {
+            reject(new Error(`Failed to download ${currentUrl}: status ${statusCode}`))
+            return
+          }
+
+          const fileStream = createWriteStream(destination)
+          pipeline(res, fileStream).then(resolve).catch(reject)
+        })
+
+        req.on('error', reject)
+        req.end()
+      }
+
+      download(url)
+    })
+  }
+
+  private async initializeWasmFallback(): Promise<void> {
+    try {
+      const esbuildWasm = (await import('esbuild-wasm')) as typeof import('esbuild-wasm')
+      const wasmPath = app.isPackaged
+        ? join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'esbuild-wasm', 'esbuild.wasm')
+        : require.resolve('esbuild-wasm/esbuild.wasm')
+      
+      // Check if WASM file exists
+      try {
+        await access(wasmPath)
+      } catch (accessError) {
+        logger.error('esbuild-wasm file not found:', {
+          wasmPath,
+          isPackaged: app.isPackaged,
+          resourcesPath: process.resourcesPath,
+          error: accessError as Error
+        })
+        throw new Error(`esbuild-wasm file not found at ${wasmPath}. Ensure esbuild-wasm is unpacked in electron-builder.yml`)
+      }
+      
+      // In Node.js, esbuild-wasm expects a filesystem path
+      const wasmBinary = await readFile(wasmPath)
+
+      await (esbuildWasm as any).initialize({
+        wasmBinary,
+        worker: false
+      })
+      
+      this.esbuildImpl = esbuildWasm as unknown as typeof esbuildNative
+      this.isUsingWasm = true
+
+      logger.warn('Using esbuild-wasm fallback. Artifact transpilation may be slower.')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      logger.error('Failed to initialize esbuild-wasm fallback:', {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath
+      })
+      throw new Error(`Failed to initialize esbuild-wasm: ${errorMessage}`)
     }
   }
 
@@ -228,58 +521,149 @@ export class ArtifactTranspilerService {
   /**
    * Transpile React/JSX/TSX code using esbuild
    */
-  private async transpileReact(code: string, language: 'typescript' | 'javascript'): Promise<TranspileResult> {
-    const loader = language === 'typescript' ? 'tsx' : 'jsx'
+  private async transpileReact(
+    code: string,
+    language: 'typescript' | 'javascript',
+    hasJsx: boolean
+  ): Promise<TranspileResult> {
+    const { loader, extension } = this.resolveReactLoader(language, hasJsx)
 
-    const result = await esbuild.transform(code, {
-      loader,
-      jsx: 'transform',
-      jsxFactory: 'React.createElement',
-      jsxFragment: 'React.Fragment',
-      target: 'es2020',
+    try {
+      const result = await this.esbuildImpl.build({
+        stdin: {
+          contents: code,
+          resolveDir: process.cwd(),
+          sourcefile: `Component.${extension}`,
+          loader
+        },
+        write: false,
+        bundle: false,
+        format: 'cjs',
+        platform: 'browser',
+        target: 'es2020',
+        sourcemap: 'inline',
+        logLevel: 'warning',
+        plugins: [react18Plugin()]
+      })
+
+      const output = result.outputFiles?.[0]
+      if (!output) {
+        throw new Error('React transpilation produced no output')
+      }
+
+      return {
+        code: this.wrapModule(output.text),
+        warnings: result.warnings
+      }
+    } catch (error) {
+      if (!hasJsx && this.isJsxNotEnabledError(error)) {
+        logger.warn(
+          '[ArtifactTranspilerService] JSX syntax error detected for artifact marked as plain JS. Retrying with JSX loader...'
+        )
+        return this.transpileReact(code, language, true)
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Transpile Svelte component using esbuild-svelte
+   */
+  private async transpileSvelte(code: string): Promise<TranspileResult> {
+    const result = await this.esbuildImpl.build({
+      stdin: {
+        contents: code,
+        resolveDir: process.cwd(),
+        sourcefile: 'Component.svelte'
+      },
+      bundle: true,
+      write: false,
       format: 'cjs',
-      sourcemap: 'inline'
+      platform: 'browser',
+      target: 'es2020',
+      sourcemap: 'inline',
+      logLevel: 'warning',
+      plugins: [
+        sveltePlugin({
+          compilerOptions: {
+            css: true,
+            generate: 'dom'
+          }
+        })
+      ]
     })
 
+    const output = result.outputFiles?.[0]
+    if (!output) {
+      throw new Error('Svelte transpilation produced no output')
+    }
+
     return {
-      code: this.wrapModule(result.code),
+      code: this.wrapModule(output.text),
       warnings: result.warnings
     }
   }
 
   /**
-   * Transpile Svelte component
-   * Note: Requires esbuild-svelte plugin (optional dependency)
+   * Transpile Solid component using esbuild-plugin-solid
    */
-  private async transpileSvelte(_code: string): Promise<TranspileResult> {
-    // TODO: Implement Svelte support with esbuild-svelte plugin
-    // For now, return error
-    throw new Error(
-      'Svelte transpilation not yet implemented. Install esbuild-svelte plugin and uncomment implementation.'
-    )
-
-    /*
-    // Example implementation (requires esbuild-svelte):
-    import { svelte } from 'esbuild-svelte'
-    
-    const result = await esbuild.build({
+  private async transpileSolid(code: string): Promise<TranspileResult> {
+    const result = await this.esbuildImpl.build({
       stdin: {
         contents: code,
-        loader: 'ts',
-        resolveDir: '.'
+        resolveDir: process.cwd(),
+        sourcefile: 'Component.tsx'
       },
-      plugins: [svelte()],
-      format: 'cjs',
-      bundle: false,
       write: false,
-      sourcemap: 'inline'
+      bundle: false,
+      format: 'cjs',
+      platform: 'browser',
+      target: 'es2020',
+      sourcemap: 'inline',
+      logLevel: 'warning',
+      plugins: [solidPlugin()]
     })
-    
+
+    const output = result.outputFiles?.[0]
+    if (!output) {
+      throw new Error('Solid transpilation produced no output')
+    }
+
     return {
-      code: result.outputFiles[0].text,
+      code: this.wrapModule(output.text),
       warnings: result.warnings
     }
-    */
+  }
+
+  /**
+   * Transpile Vue component using esbuild-plugin-vue3
+   */
+  private async transpileVue(code: string): Promise<TranspileResult> {
+    const result = await this.esbuildImpl.build({
+      stdin: {
+        contents: code,
+        resolveDir: process.cwd(),
+        sourcefile: 'Component.vue'
+      },
+      write: false,
+      bundle: true,
+      format: 'cjs',
+      platform: 'browser',
+      target: 'es2020',
+      sourcemap: 'inline',
+      logLevel: 'warning',
+      plugins: [vuePlugin()]
+    })
+
+    const output = result.outputFiles?.[0]
+    if (!output) {
+      throw new Error('Vue transpilation produced no output')
+    }
+
+    return {
+      code: this.wrapModule(output.text),
+      warnings: result.warnings
+    }
   }
 
   /**
@@ -293,6 +677,7 @@ export class ArtifactTranspilerService {
     const startTime = performance.now()
 
     try {
+      const hasJsx = this.containsLikelyJsx(request.code)
       // Step 1: Pre-process imports
       const processedCode = this.preprocessImports(request.code)
 
@@ -308,7 +693,7 @@ export class ArtifactTranspilerService {
       switch (request.framework) {
         case 'react':
         case 'preact': // Preact uses same JSX syntax
-          result = await this.transpileReact(processedCode, request.language)
+          result = await this.transpileReact(processedCode, request.language, hasJsx)
           break
 
         case 'svelte':
@@ -316,8 +701,12 @@ export class ArtifactTranspilerService {
           break
 
         case 'vue':
+          result = await this.transpileVue(processedCode)
+          break
+
         case 'solid':
-          throw new Error(`${request.framework} support not yet implemented`)
+          result = await this.transpileSolid(processedCode)
+          break
 
         default:
           throw new Error(`Unsupported framework: ${request.framework}`)
@@ -338,7 +727,7 @@ export class ArtifactTranspilerService {
 
       // Format esbuild errors nicely
       if (error && typeof error === 'object' && 'errors' in error) {
-        const esbuildError = error as esbuild.TransformFailure
+        const esbuildError = error as TransformFailure
         const firstError = esbuildError.errors[0]
 
         if (firstError) {
@@ -373,6 +762,56 @@ export class ArtifactTranspilerService {
     // esbuild doesn't need explicit cleanup
     this.isInitialized = false
     logger.info('ArtifactTranspilerService disposed')
+  }
+
+  private resolveReactLoader(language: 'typescript' | 'javascript', hasJsx: boolean): {
+    loader: Loader
+    extension: string
+  } {
+    if (language === 'typescript') {
+      return { loader: 'tsx', extension: 'tsx' }
+    }
+
+    if (hasJsx) {
+      return { loader: 'jsx', extension: 'jsx' }
+    }
+
+    return { loader: 'js', extension: 'js' }
+  }
+
+  private containsLikelyJsx(code: string): boolean {
+    const stripped = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const tagPattern = /<\s*([A-Za-z][\w-]*|>)/m
+    const fragmentPattern = /return\s*\(\s*(<>|<\/?[A-Za-z])/m
+    const reactCreateElementPattern = /React\.createElement\s*\(/m
+    return tagPattern.test(stripped) || fragmentPattern.test(stripped) || reactCreateElementPattern.test(stripped)
+  }
+
+  private isJsxNotEnabledError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false
+    }
+
+    const hasExplicitMessage =
+      'message' in error && typeof (error as { message?: string }).message === 'string'
+        ? (error as { message: string }).message
+        : ''
+
+    if (hasExplicitMessage.toLowerCase().includes('jsx syntax extension is not currently enabled')) {
+      return true
+    }
+
+    if ('errors' in error) {
+      const transformError = error as TransformFailure
+      return (
+        Array.isArray(transformError.errors) &&
+        transformError.errors.some((e) =>
+          e.text?.toLowerCase().includes('jsx syntax extension is not currently enabled')
+        )
+      )
+    }
+
+    return false
   }
 }
 

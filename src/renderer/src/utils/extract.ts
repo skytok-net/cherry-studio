@@ -21,13 +21,14 @@ export interface KnowledgeExtractResults {
  * @returns {ExtractResults} 提取的信息对象
  * @throws
  */
-export const extractInfoFromXML = (text: string): ExtractResults => {
-  // Logger.log('extract text', text)
+export const extractInfoFromXML = (text: string): ExtractResults | null => {
   const parser = new XMLParser({
-    isArray: (name) => {
-      return name === 'question' || name === 'links'
-    }
+    isArray: (name) => name === 'question' || name === 'links'
   })
-  // Logger.log('Extracted results:', extractResults)
-  return parser.parse(text)
+
+  try {
+    return parser.parse(text)
+  } catch (error) {
+    return null
+  }
 }

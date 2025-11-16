@@ -38,6 +38,15 @@ import { initWebviewHotkeys } from './services/WebviewService'
 const logger = loggerService.withContext('MainEntry')
 
 /**
+ * Suppress Electron security warnings in development
+ * These warnings are expected when we intentionally relax security for artifact rendering
+ * They will not appear in production builds
+ */
+if (isDev) {
+  process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true'
+}
+
+/**
  * Disable hardware acceleration if setting is enabled
  */
 const disableHardwareAcceleration = configManager.getDisableHardwareAcceleration()

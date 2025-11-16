@@ -4,6 +4,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
 
+import reactDomUmd from './runtimeAssets/generated/react-dom.dev.bundle.js?raw'
+import reactFlowCss from './runtimeAssets/generated/reactflow.css?raw'
+import reactFlowBaseCss from './runtimeAssets/generated/reactflow-base.css?raw'
+import reactFlowUmd from './runtimeAssets/generated/reactflow.umd.js?raw'
+import reactUmd from './runtimeAssets/generated/react.dev.bundle.js?raw'
+import lucideReactUmd from './runtimeAssets/generated/lucide-react.min.js?raw'
+import clsxUmd from './runtimeAssets/generated/clsx.min.js?raw'
+import tailwindCdnScript from './runtimeAssets/generated/tailwind-cdn.js?raw'
+import tailwindMergeBundle from './runtimeAssets/generated/tailwind-merge.js?raw'
+import cvaBundle from './runtimeAssets/generated/class-variance-authority.js?raw'
+import preactCompatBundle from './runtimeAssets/generated/preact-compat.js?raw'
+import solidRuntimeBundle from './runtimeAssets/generated/solid-runtime.js?raw'
+
 const logger = loggerService.withContext('UniversalArtifactViewer')
 
 /**
@@ -33,15 +46,21 @@ export interface UniversalArtifactViewerProps {
   onSuccess?: () => void
 }
 
+const escapeInlineScript = (code: string): string =>
+  code.replace(/<\/(script)/gi, '<\\/$1')
+
+const createScriptTag = (code: string): string => `<script>${escapeInlineScript(code)}</script>`
+
 /**
  * Framework runtime dependencies (CDN)
  */
-const FRAMEWORK_RUNTIMES: Record<ArtifactFramework, { scripts: string[]; styles: string[] }> = {
+const FRAMEWORK_RUNTIMES: Record<
+  ArtifactFramework,
+  { scripts: string[]; inlineScripts?: string[]; styles: string[] }
+> = {
   react: {
-    scripts: [
-      'https://unpkg.com/react@18/umd/react.development.js',
-      'https://unpkg.com/react-dom@18/umd/react-dom.development.js'
-    ],
+    scripts: [],
+    inlineScripts: [reactUmd, reactDomUmd],
     styles: []
   },
   preact: {
@@ -49,7 +68,8 @@ const FRAMEWORK_RUNTIMES: Record<ArtifactFramework, { scripts: string[]; styles:
       'https://unpkg.com/preact@10/dist/preact.umd.js',
       'https://unpkg.com/preact@10/hooks/dist/hooks.umd.js'
     ],
-    styles: []
+    styles: [],
+    inlineScripts: [preactCompatBundle]
   },
   svelte: {
     scripts: [],
@@ -60,19 +80,15 @@ const FRAMEWORK_RUNTIMES: Record<ArtifactFramework, { scripts: string[]; styles:
     styles: []
   },
   solid: {
-    scripts: ['https://unpkg.com/solid-js@1/dist/solid.min.js'],
-    styles: []
+    scripts: [],
+    styles: [],
+    inlineScripts: [solidRuntimeBundle]
   }
 }
 
 const SHARED_LIBRARIES = {
-  scripts: [
-    'https://cdn.jsdelivr.net/npm/@xyflow/react@12.9.3/dist/umd/index.min.js',
-    'https://unpkg.com/lucide@latest/dist/umd/lucide.js',
-    'https://unpkg.com/clsx@2.1.1/dist/clsx.min.js',
-    'https://cdn.tailwindcss.com'
-  ],
-  styles: ['https://cdn.jsdelivr.net/npm/@xyflow/react@12.9.3/dist/style.min.css']
+  inlineScripts: [reactFlowUmd, lucideReactUmd, clsxUmd, tailwindCdnScript, tailwindMergeBundle, cvaBundle],
+  inlineStyles: [reactFlowCss, reactFlowBaseCss]
 }
 
 /**
@@ -121,6 +137,7 @@ export function UniversalArtifactViewer({
   <title>${framework.toUpperCase()} Artifact Sandbox</title>
 
   <!-- STEP 1: Load React and ReactDOM FIRST -->
+  ${runtimeDeps.inlineScripts?.map(content => createScriptTag(content)).join('\n  ') ?? ''}
   ${runtimeDeps.scripts.map(src => `<script crossorigin src="${src}"></script>`).join('\n  ')}
   ${runtimeDeps.styles.map(href => `<link rel="stylesheet" href="${href}" />`).join('\n  ')}
 
@@ -130,7 +147,7 @@ export function UniversalArtifactViewer({
     // This MUST complete before ReactFlow starts loading
     (function() {
       console.log('[Sandbox] Waiting for React to load...');
-      var maxAttempts = 200; // 2 seconds max (200 * 10ms)
+      var maxAttempts = 1000; // 10 seconds max (1000 * 10ms)
       var attempts = 0;
       
       // Busy-wait loop (synchronous, blocks script execution)
@@ -161,6 +178,9 @@ export function UniversalArtifactViewer({
             window.React.jsxDEV = jsxFunc;
             window.React.Fragment = Symbol.for('react.fragment');
 
+            if (!window.React.default) {
+              window.React.default = window.React;
+            }
             if (window.React.default) {
               window.React.default.jsx = jsxFunc;
               window.React.default.jsxs = jsxFunc;
@@ -170,8 +190,22 @@ export function UniversalArtifactViewer({
 
             window.jsx = jsxFunc;
             window.jsxs = jsxFunc;
+            window.jsxDEV = jsxFunc;
             window.jsxRuntime = runtime;
+            window.jsxDEVRuntime = runtime;
             window.ReactJsxRuntime = runtime;
+
+            if (typeof globalThis !== 'undefined') {
+              if (!globalThis.jsxRuntime) {
+                globalThis.jsxRuntime = runtime;
+              }
+              if (!globalThis.React) {
+                globalThis.React = window.React;
+              }
+              if (!globalThis.ReactDOM) {
+                globalThis.ReactDOM = window.ReactDOM;
+              }
+            }
 
             if (typeof define !== 'undefined' && define.amd) {
               define('react/jsx-runtime', [], function() {
@@ -238,6 +272,12 @@ export function UniversalArtifactViewer({
                 if (moduleName === 'react/jsx-runtime' || moduleName === 'react/jsx-dev-runtime') {
                   return window.jsxRuntime;
                 }
+                if (moduleName === 'react') {
+                  return window.React;
+                }
+                if (moduleName === 'react-dom' || moduleName === 'react-dom/client') {
+                  return window.ReactDOM;
+                }
                 if (moduleName === 'path') {
                   return window.__SANDBOX_PATH_MODULE__;
                 }
@@ -275,9 +315,55 @@ export function UniversalArtifactViewer({
     })();
   </script>
 
-  <!-- STEP 3: Load ReactFlow and other libraries (NOW React.jsx exists!) -->
-  ${SHARED_LIBRARIES.scripts.map(src => `<script src="${src}"></script>`).join('\n  ')}
-  ${SHARED_LIBRARIES.styles.map(href => `<link rel="stylesheet" href="${href}" />`).join('\n  ')}
+  <!-- STEP 3: Load ReactFlow and other libraries SYNCHRONOUSLY (React is guaranteed ready by now) -->
+  <script>
+    // Verify React is ready AND all critical APIs exist before loading dependent libraries
+    if (!window.__FRAMEWORK_READY__ || !window.React || !window.ReactDOM) {
+      console.error('[Sandbox] FATAL: React not ready for library loading');
+      throw new Error('React not ready');
+    }
+    
+    // CRITICAL: Verify React has all required APIs (forwardRef, createElement, Component, etc.)
+    var requiredApis = ['forwardRef', 'createElement', 'Component', 'Fragment', 'useState', 'useEffect'];
+    var missingApis = requiredApis.filter(function(api) {
+      return !window.React || !window.React[api];
+    });
+    
+    if (missingApis.length > 0) {
+      console.error('[Sandbox] FATAL: React APIs not fully initialized. Missing:', missingApis);
+      throw new Error('React APIs not ready: ' + missingApis.join(', '));
+    }
+    
+    // Ensure require shim is available and returns React correctly
+    if (!window.require || typeof window.require !== 'function') {
+      console.error('[Sandbox] FATAL: require shim not available');
+      throw new Error('require shim not available');
+    }
+    
+    // CRITICAL: Ensure React is available globally for UMD bundles that access it directly
+    // Some UMD bundles check for window.React before using require()
+    if (typeof window.React === 'undefined') {
+      console.error('[Sandbox] FATAL: window.React is undefined');
+      throw new Error('window.React is undefined');
+    }
+    
+    // Test require shim returns React correctly
+    var testReact = window.require('react');
+    if (!testReact || testReact !== window.React) {
+      console.error('[Sandbox] FATAL: require("react") does not return window.React');
+      throw new Error('require shim not working correctly');
+    }
+    
+    console.log('[Sandbox] React confirmed ready with all APIs, loading shared libraries synchronously...');
+  </script>
+  
+  <!-- Load all shared libraries as inline scripts (they execute synchronously in order) -->
+  ${SHARED_LIBRARIES.inlineScripts.map(content => createScriptTag(content)).join('\n  ')}
+  ${SHARED_LIBRARIES.inlineStyles.map(style => `<style>${style}</style>`).join('\n  ')}
+  
+  <script>
+    console.log('[Sandbox] All shared libraries loaded successfully');
+  </script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -347,6 +433,22 @@ export function UniversalArtifactViewer({
             window.cn = function() {
               return window.clsx ? window.clsx.apply(null, arguments) : '';
             };
+
+            if (window.TailwindMergeBundle) {
+              var mergeFn =
+                window.TailwindMergeBundle.tailwindMerge || window.TailwindMergeBundle.default;
+              if (mergeFn) {
+                window.tailwindMerge = mergeFn;
+              }
+            }
+
+            if (window.ClassVarianceAuthorityBundle) {
+              var cvaFn =
+                window.ClassVarianceAuthorityBundle.cva || window.ClassVarianceAuthorityBundle.default;
+              if (cvaFn) {
+                window.cva = cvaFn;
+              }
+            }
             
             // Fetch API
             window.fetchApi = window.fetch.bind(window);
@@ -409,10 +511,15 @@ export function UniversalArtifactViewer({
             // Render based on framework
             if ('${framework}' === 'react' && window.ReactDOM) {
               if (window.ReactDOM.createRoot) {
-                var reactRoot = window.ReactDOM.createRoot(root);
-                reactRoot.render(window.React.createElement(ComponentToRender));
-              } else {
+                if (window.__REACT_ROOT && window.__REACT_ROOT.unmount) {
+                  try { window.__REACT_ROOT.unmount() } catch (err) {}
+                }
+                window.__REACT_ROOT = window.ReactDOM.createRoot(root);
+                window.__REACT_ROOT.render(window.React.createElement(ComponentToRender));
+              } else if (typeof window.ReactDOM.render === 'function') {
                 window.ReactDOM.render(window.React.createElement(ComponentToRender), root);
+              } else {
+                throw new Error('ReactDOM render APIs are unavailable in the sandbox runtime.');
               }
               console.log('[Sandbox] React component rendered');
             } else if ('${framework}' === 'vue' && window.Vue) {

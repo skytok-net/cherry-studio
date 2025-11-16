@@ -1,0 +1,30 @@
+{
+  "name": "artifact-transpiler-test",
+  "version": "1.0.0",
+  "description": "Test utility for artifact transpilation with esbuild",
+  "type": "module",
+  "scripts": {
+    "transpile": "tsx src/transpiler.ts",
+    "transpile:all": "tsx src/transpiler.ts --all",
+    "transpile:react": "tsx src/transpiler.ts --framework react",
+    "transpile:svelte": "tsx src/transpiler.ts --framework svelte",
+    "transpile:vue": "tsx src/transpiler.ts --framework vue",
+    "transpile:solid": "tsx src/transpiler.ts --framework solid",
+    "transpile:preact": "tsx src/transpiler.ts --framework preact"
+  },
+  "dependencies": {
+    "esbuild": "^0.24.0",
+    "esbuild-plugin-react18": "^0.2.5",
+    "esbuild-plugin-solid": "^0.6.0",
+    "esbuild-plugin-vue3": "^0.4.2",
+    "esbuild-svelte": "^0.8.2",
+    "solid-js": "^1.9.3",
+    "svelte": "^4.2.19",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

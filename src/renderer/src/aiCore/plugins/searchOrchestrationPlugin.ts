@@ -148,13 +148,37 @@ async function analyzeSearchIntent(
       })
     })
     const parsedResult = extractInfoFromXML(result)
-    logger.debug('Intent analysis result', { parsedResult })
 
-    // 根据需求过滤结果
-    return {
-      websearch: needWebExtract ? parsedResult?.websearch : undefined,
-      knowledge: needKnowledgeExtract ? parsedResult?.knowledge : undefined
+    if (!parsedResult) {
+      logger.warn('Intent analysis returned malformed XML, using fallback keywords.')
+      return getFallbackResult()
     }
+
+    const normalizedResult = {
+      websearch: parsedResult.websearch ?? (parsedResult as any).root?.websearch,
+      knowledge: parsedResult.knowledge ?? (parsedResult as any).root?.knowledge
+    }
+
+    const response: ExtractResults = {
+      websearch: needWebExtract ? normalizedResult.websearch : undefined,
+      knowledge: needKnowledgeExtract ? normalizedResult.knowledge : undefined
+    }
+
+    const missingWeb = needWebExtract && !response.websearch
+    const missingKnowledge = needKnowledgeExtract && !response.knowledge
+
+    if (missingWeb || missingKnowledge) {
+      logger.warn('Intent analysis missing expected sections, using fallback keywords.', {
+        needWebExtract,
+        needKnowledgeExtract,
+        normalizedResult
+      })
+      return getFallbackResult()
+    }
+
+    logger.debug('Intent analysis result', { parsedResult: response })
+
+    return response
   } catch (e: any) {
     logger.error('Intent analysis failed', e as Error)
     return getFallbackResult()
