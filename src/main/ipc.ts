@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import { loggerService } from '@logger'
 import { isLinux, isMac, isPortable, isWin } from '@main/constant'
-import { generateSignature } from '@main/integration/cherryai'
+// import { generateSignature } from '@main/integration/cherryai' // Temporarily commented out due to CommonJS/ESM compatibility issue
 import anthropicService from '@main/services/AnthropicService'
 import { getBinaryPath, isBinaryExists, runInstallScript } from '@main/utils/process'
 import { handleZoomFactor } from '@main/utils/zoom'
@@ -34,8 +34,8 @@ import { apiServerService } from './services/ApiServerService'
 import appService from './services/AppService'
 import AppUpdater from './services/AppUpdater'
 import { artifactRetryService } from './services/ArtifactRetryService'
-import type { TranspileRequest } from './services/ArtifactTranspilerService'
-import { artifactTranspilerService } from './services/ArtifactTranspilerService'
+import type { TranspileRequest } from './services/transpilation/LegacyArtifactTranspilerService'
+import { artifactTranspilerService } from './services/transpilation/LegacyArtifactTranspilerService'
 import BackupManager from './services/BackupManager'
 import { codeToolsService } from './services/CodeToolsService'
 import { configManager } from './services/ConfigManager'
@@ -1016,7 +1016,7 @@ export function registerIpc(mainWindow: BrowserWindow, app: Electron.App) {
   ipcMain.handle(IpcChannel.Ovms_StopOVMS, () => ovmsManager.stopOvms())
 
   // CherryAI
-  ipcMain.handle(IpcChannel.Cherryai_GetSignature, (_, params) => generateSignature(params))
+  // ipcMain.handle(IpcChannel.Cherryai_GetSignature, (_, params) => generateSignature(params)) // Temporarily commented out
 
   // Claude Code Plugins
   ipcMain.handle(IpcChannel.ClaudeCodePlugin_ListAvailable, async () => {

@@ -24,7 +24,9 @@ vi.mock('electron', () => ({
           return '/mock/unknown'
       }
     }),
-    getVersion: vi.fn(() => '1.0.0')
+    getAppPath: vi.fn(() => '/mock/app'),
+    getVersion: vi.fn(() => '1.0.0'),
+    isPackaged: true
   },
   ipcMain: {
     handle: vi.fn(),
@@ -117,23 +119,54 @@ vi.mock('node:path', async () => {
 
 vi.mock('node:fs', () => ({
   promises: {
-    access: vi.fn(),
+    access: vi.fn().mockResolvedValue(undefined), // File exists and is accessible
     readFile: vi.fn(),
     writeFile: vi.fn(),
     mkdir: vi.fn(),
     readdir: vi.fn(),
-    stat: vi.fn(),
+    stat: vi.fn().mockResolvedValue({
+      isFile: () => true,
+      mode: 0o755 // Executable permissions
+    }),
     unlink: vi.fn(),
     rmdir: vi.fn()
   },
-  existsSync: vi.fn(),
+  existsSync: vi.fn().mockReturnValue(true),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
-  statSync: vi.fn(),
+  statSync: vi.fn().mockReturnValue({
+    isFile: () => true,
+    mode: 0o755 // Executable permissions
+  }),
   unlinkSync: vi.fn(),
   rmdirSync: vi.fn(),
   createReadStream: vi.fn(),
-  createWriteStream: vi.fn()
+  createWriteStream: vi.fn(),
+  constants: {
+    F_OK: 0,
+    R_OK: 4,
+    W_OK: 2,
+    X_OK: 1
+  }
+}))
+
+// Mock child_process for binary verification
+vi.mock('node:child_process', () => ({
+  exec: vi.fn((cmd: string, callback: Function) => {
+    // Mock esbuild --version output
+    if (cmd.includes('--version')) {
+      callback(null, { stdout: '0.19.0', stderr: '' });
+    } else {
+      callback(null, { stdout: 'mock output', stderr: '' });
+    }
+  }),
+  execSync: vi.fn((cmd: string) => {
+    if (cmd.includes('--version')) {
+      return '0.19.0';
+    }
+    return 'mock output';
+  }),
+  spawn: vi.fn()
 }))

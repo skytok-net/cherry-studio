@@ -1,0 +1,1 @@
+"use strict";Object.defineProperty(exports,Symbol.toStringTag,{value:"Module"});const E=require("./index-BgoHP2Cq.js");exports.ENV_ACCOUNT_ID=E.ENV_ACCOUNT_ID;exports.ENV_CREDENTIAL_SCOPE=E.ENV_CREDENTIAL_SCOPE;exports.ENV_EXPIRATION=E.ENV_EXPIRATION;exports.ENV_KEY=E.ENV_KEY;exports.ENV_SECRET=E.ENV_SECRET;exports.ENV_SESSION=E.ENV_SESSION;exports.fromEnv=E.fromEnv;

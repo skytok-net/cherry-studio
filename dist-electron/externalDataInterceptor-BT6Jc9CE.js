@@ -1,0 +1,1 @@
+"use strict";const r=require("./getSSOTokenFromFile-CpFpM0My.js"),n=require("./index-DXBDf5SO.js"),o={getFileRecord(){return n.fileIntercept},interceptFile(e,t){n.fileIntercept[e]=Promise.resolve(t)},getTokenRecord(){return r.tokenIntercept},interceptToken(e,t){r.tokenIntercept[e]=t}};exports.externalDataInterceptor=o;

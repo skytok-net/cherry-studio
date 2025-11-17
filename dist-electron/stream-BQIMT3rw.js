@@ -1,0 +1,1 @@
+"use strict";async function f(r){return new Promise((o,u)=>{const n=Array();r.on("data",e=>n.push(e)),r.on("end",()=>o(Buffer.concat(n))),r.on("error",e=>u(`error converting stream - ${e}`))})}function i(r){return r&&(r.includes(";")?r.split(";")[0]:r)}exports.contentTypeToMimeType=i;exports.streamToBuffer=f;

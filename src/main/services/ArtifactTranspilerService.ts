@@ -3,7 +3,7 @@ import { access, chmod, copyFile, mkdir, mkdtemp, rm, stat } from 'node:fs/promi
 import type { IncomingMessage } from 'node:http'
 import { request } from 'node:https'
 import { tmpdir } from 'node:os'
-import { dirname,join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 
 import { loggerService } from '@logger'
@@ -30,11 +30,11 @@ function getCallerInfo(): { file: string; line: number; function: string } {
   if (!stack) {
     return { file: 'unknown', line: 0, function: 'unknown' }
   }
-  
+
   const lines = stack.split('\n')
   // Skip Error, getCallerInfo, and the actual caller (index 3)
   const callerLine = lines[3] || lines[2] || lines[1] || ''
-  
+
   // Match: "    at FunctionName (file:///path/to/file.ts:123:45)"
   const match = callerLine.match(/at\s+(?:(.+?)\s+\()?(.+?):(\d+):(\d+)\)?$/)
   if (match) {
@@ -43,14 +43,17 @@ function getCallerInfo(): { file: string; line: number; function: string } {
     const line = parseInt(match[3] || '0', 10)
     return { file, line, function: functionName }
   }
-  
+
   return { file: 'unknown', line: 0, function: 'unknown' }
 }
 
 /**
  * Format error with full context including file, line, and stack trace
  */
-function formatErrorWithContext(error: unknown, context?: string): {
+function formatErrorWithContext(
+  error: unknown,
+  context?: string
+): {
   message: string
   stack: string | undefined
   file: string
@@ -61,7 +64,7 @@ function formatErrorWithContext(error: unknown, context?: string): {
   const caller = getCallerInfo()
   const errorMessage = error instanceof Error ? error.message : String(error)
   const errorStack = error instanceof Error ? error.stack : undefined
-  
+
   return {
     message: errorMessage,
     stack: errorStack,
@@ -198,8 +201,7 @@ const IMPORT_MAPPINGS: ImportMappingDefinition[] = [
   }
 ]
 
-const importStatementRegex =
-  /import\s+(type\s+)?(?:([\w$]+)(?:\s*,\s*{([^}]+)})?|{([^}]+)})\s+from\s+['"]([^'"]+)['"]/g
+const importStatementRegex = /import\s+(type\s+)?(?:([\w$]+)(?:\s*,\s*{([^}]+)})?|{([^}]+)})\s+from\s+['"]([^'"]+)['"]/g
 
 const resolveImportExpressions = (moduleName: string): ImportResolution | null => {
   for (const mapping of IMPORT_MAPPINGS) {
@@ -266,7 +268,7 @@ export class ArtifactTranspilerService {
   async initialize(): Promise<void> {
     const caller = getCallerInfo()
     logger.info(`[ArtifactTranspilerService.initialize] ENTRY at ${caller.file}:${caller.line}`)
-    
+
     if (this.isInitialized) {
       logger.info(`[ArtifactTranspilerService.initialize] Already initialized, skipping`)
       return
@@ -275,7 +277,7 @@ export class ArtifactTranspilerService {
     try {
       logger.info(`[ArtifactTranspilerService.initialize] Step 1: Ensuring disk space...`)
       await this.ensureDiskSpace()
-      
+
       logger.info(`[ArtifactTranspilerService.initialize] Step 2: Ensuring esbuild binary...`)
       await this.ensureEsbuildBinary()
 
@@ -283,20 +285,24 @@ export class ArtifactTranspilerService {
       try {
         logger.info(`[ArtifactTranspilerService] Testing esbuild binary execution...`)
         await this.esbuildImpl.transform('let __esbuild_probe__ = 1', { loader: 'js' })
-        logger.info(`[ArtifactTranspilerService] ✓ esbuild file is executable (can run with no errors) - version ${this.esbuildImpl.version}`)
+        logger.info(
+          `[ArtifactTranspilerService] ✓ esbuild file is executable (can run with no errors) - version ${this.esbuildImpl.version}`
+        )
         logger.info(`Native esbuild initialized successfully (version ${this.esbuildImpl.version})`)
       } catch (nativeError) {
         // Native esbuild failed - try to download/ensure binary is available
         logger.warn('Native esbuild probe failed, attempting to ensure binary is available...', nativeError as Error)
-        
+
         // Try to ensure binary one more time
         await this.ensureEsbuildBinary()
-        
+
         // Retry the probe
         try {
           logger.info(`[ArtifactTranspilerService] Retrying esbuild binary execution test...`)
           await this.esbuildImpl.transform('let __esbuild_probe__ = 1', { loader: 'js' })
-          logger.info(`[ArtifactTranspilerService] ✓ esbuild file is executable (can run with no errors) - version ${this.esbuildImpl.version}`)
+          logger.info(
+            `[ArtifactTranspilerService] ✓ esbuild file is executable (can run with no errors) - version ${this.esbuildImpl.version}`
+          )
           logger.info(`Native esbuild initialized successfully after retry (version ${this.esbuildImpl.version})`)
         } catch (retryError) {
           // Native esbuild failed - fallback to WASM version
@@ -304,12 +310,14 @@ export class ArtifactTranspilerService {
             originalError: nativeError as Error,
             retryError: retryError as Error
           })
-          
+
           await this.initializeWasm()
         }
       }
 
-      logger.info(`[ArtifactTranspilerService.initialize] ✓ esbuild initialized (version ${this.esbuildImpl.version}, usingWasm: ${this.usingWasm})`)
+      logger.info(
+        `[ArtifactTranspilerService.initialize] ✓ esbuild initialized (version ${this.esbuildImpl.version}, usingWasm: ${this.usingWasm})`
+      )
 
       this.isInitialized = true
       logger.info(`[ArtifactTranspilerService.initialize] EXIT - Success`)
@@ -326,7 +334,7 @@ export class ArtifactTranspilerService {
       })
       throw new Error(
         `Failed to initialize transpiler service at ${errorContext.file}:${errorContext.line} ` +
-        `in ${errorContext.function}: ${errorContext.message}`
+          `in ${errorContext.function}: ${errorContext.message}`
       )
     }
   }
@@ -337,53 +345,25 @@ export class ArtifactTranspilerService {
   private async initializeWasm(): Promise<void> {
     const caller = getCallerInfo()
     logger.info(`[ArtifactTranspilerService.initializeWasm] ENTRY at ${caller.file}:${caller.line}`)
-    
+
     try {
-      logger.info('[ArtifactTranspilerService.initializeWasm] Step 1: Dynamically importing esbuild-wasm...')
-      
-      // Dynamically import esbuild-wasm
-      // @ts-expect-error - esbuild-wasm may not be installed, handled at runtime
+      logger.info('[ArtifactTranspilerService.initializeWasm] Dynamically importing esbuild-wasm...')
       const esbuildWasm = await import('esbuild-wasm')
-      logger.info('[ArtifactTranspilerService.initializeWasm] ✓ esbuild-wasm imported successfully')
-      
-      // Get the path to the WASM file
-      // In development: from node_modules
-      // In production: from app.asar or app.asar.unpacked
-      let wasmPath: string
-      if (app && app.isPackaged) {
-        // In production, try unpacked first, then asar
-        const unpackedPath = join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'esbuild-wasm', 'esbuild.wasm')
-        const asarPath = join(process.resourcesPath, 'app.asar', 'node_modules', 'esbuild-wasm', 'esbuild.wasm')
-        
-        if (await this.fileExists(unpackedPath)) {
-          wasmPath = `file://${unpackedPath}`
-        } else if (await this.fileExists(asarPath)) {
-          wasmPath = `file://${asarPath}`
-        } else {
-          // Fallback: try to resolve from require
-          try {
-            wasmPath = `file://${require.resolve('esbuild-wasm/esbuild.wasm')}`
-          } catch {
-            throw new Error('esbuild-wasm/esbuild.wasm not found in packaged app')
-          }
-        }
-      } else {
-        // In development, use require.resolve
-        wasmPath = `file://${require.resolve('esbuild-wasm/esbuild.wasm')}`
-      }
-      
-      // Initialize WASM
-      await esbuildWasm.initialize({
-        wasmURL: wasmPath
-      })
-      
+      logger.info('[ArtifactTranspilerService.initializeWasm] ✓ imported successfully')
+
+      // Initialize for Node.js - let esbuild-wasm auto-detect and load from node_modules
+      logger.info('[ArtifactTranspilerService.initializeWasm] Initializing for Node.js...')
+      await esbuildWasm.initialize({})
+
       this.esbuildImpl = esbuildWasm as EsbuildImpl
       this.usingWasm = true
-      
+
       // Test WASM version
       logger.info('[ArtifactTranspilerService.initializeWasm] Step 3: Testing WASM with transform probe...')
       await this.esbuildImpl.transform('let __esbuild_probe__ = 1', { loader: 'js' })
-      logger.info(`[ArtifactTranspilerService.initializeWasm] ✓ esbuild-wasm initialized successfully (version ${this.esbuildImpl.version})`)
+      logger.info(
+        `[ArtifactTranspilerService.initializeWasm] ✓ esbuild-wasm initialized successfully (version ${this.esbuildImpl.version})`
+      )
       logger.info('[ArtifactTranspilerService.initializeWasm] Using esbuild-wasm (slower but no binary required)')
       logger.info(`[ArtifactTranspilerService.initializeWasm] EXIT - Success`)
     } catch (wasmError) {
@@ -391,8 +371,8 @@ export class ArtifactTranspilerService {
       logger.error('[ArtifactTranspilerService.initializeWasm] ✗ FAILED:', errorContext)
       throw new Error(
         `Failed to initialize esbuild (both native and WASM failed) at ${errorContext.file}:${errorContext.line} ` +
-        `in ${errorContext.function}: ${errorContext.message}. ` +
-        `Please ensure esbuild-wasm is installed: yarn add esbuild-wasm`
+          `in ${errorContext.function}: ${errorContext.message}. ` +
+          `Please ensure esbuild-wasm is installed: yarn add esbuild-wasm`
       )
     }
   }
@@ -402,9 +382,9 @@ export class ArtifactTranspilerService {
    */
   private async ensureDiskSpace(): Promise<void> {
     try {
-      const targetPath = (app && app.isPackaged) ? process.resourcesPath : process.cwd()
+      const targetPath = app && app.isPackaged ? process.resourcesPath : process.cwd()
       const info = await checkDiskSpace(targetPath)
-      const freeGB = info.free / (1024 ** 3)
+      const freeGB = info.free / 1024 ** 3
       if (freeGB < 0.5) {
         logger.warn(
           `[ArtifactTranspilerService] Low disk space detected (${freeGB.toFixed(
@@ -412,9 +392,7 @@ export class ArtifactTranspilerService {
           )} GB free). Esbuild may fail if insufficient space is available.`
         )
       } else {
-        logger.info(
-          `[ArtifactTranspilerService] Disk space check OK (${freeGB.toFixed(2)} GB free at ${targetPath}).`
-        )
+        logger.info(`[ArtifactTranspilerService] Disk space check OK (${freeGB.toFixed(2)} GB free at ${targetPath}).`)
       }
     } catch (error) {
       logger.warn('[ArtifactTranspilerService] Unable to determine disk space', error as Error)
@@ -424,7 +402,7 @@ export class ArtifactTranspilerService {
   private async ensureEsbuildBinary(): Promise<void> {
     const caller = getCallerInfo()
     logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] ENTRY at ${caller.file}:${caller.line}`)
-    
+
     if (!app || !app.isPackaged) {
       logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] Not packaged, clearing ESBUILD_BINARY_PATH`)
       delete process.env.ESBUILD_BINARY_PATH
@@ -438,7 +416,9 @@ export class ArtifactTranspilerService {
       logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file found at ${bundledPath}`)
       if (await this.ensureExecutable(bundledPath)) {
         process.env.ESBUILD_BINARY_PATH = bundledPath
-        logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file is executable, using bundled binary at ${bundledPath}`)
+        logger.info(
+          `[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file is executable, using bundled binary at ${bundledPath}`
+        )
         logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] EXIT - Success (bundled path)`)
         return
       } else {
@@ -450,7 +430,9 @@ export class ArtifactTranspilerService {
 
     // Try 2: Check platform-specific esbuild package in unpacked directory
     const packageName = this.getPlatformPackageName()
-    logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] Try 2: Platform package name: ${packageName || 'none'}`)
+    logger.info(
+      `[ArtifactTranspilerService.ensureEsbuildBinary] Try 2: Platform package name: ${packageName || 'none'}`
+    )
     if (packageName) {
       const platformSpecificPath = join(
         process.resourcesPath,
@@ -460,17 +442,23 @@ export class ArtifactTranspilerService {
         'bin',
         this.getBinaryFilename()
       )
-      
-      logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] Checking platform-specific path: ${platformSpecificPath}`)
+
+      logger.info(
+        `[ArtifactTranspilerService.ensureEsbuildBinary] Checking platform-specific path: ${platformSpecificPath}`
+      )
       if (await this.fileExists(platformSpecificPath)) {
         logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file found at ${platformSpecificPath}`)
         if (await this.ensureExecutable(platformSpecificPath)) {
           process.env.ESBUILD_BINARY_PATH = platformSpecificPath
-          logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file is executable, using platform-specific binary at ${platformSpecificPath}`)
+          logger.info(
+            `[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file is executable, using platform-specific binary at ${platformSpecificPath}`
+          )
           logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] EXIT - Success (platform-specific path)`)
           return
         } else {
-          logger.warn(`[ArtifactTranspilerService.ensureEsbuildBinary] File exists but is not executable: ${platformSpecificPath}`)
+          logger.warn(
+            `[ArtifactTranspilerService.ensureEsbuildBinary] File exists but is not executable: ${platformSpecificPath}`
+          )
         }
       } else {
         logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] File not found: ${platformSpecificPath}`)
@@ -491,11 +479,15 @@ export class ArtifactTranspilerService {
       logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file found at ${fallbackPath}`)
       if (await this.ensureExecutable(fallbackPath)) {
         process.env.ESBUILD_BINARY_PATH = fallbackPath
-        logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file is executable, using downloaded binary at ${fallbackPath}`)
+        logger.info(
+          `[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file is executable, using downloaded binary at ${fallbackPath}`
+        )
         logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] EXIT - Success (fallback path)`)
         return
       } else {
-        logger.warn(`[ArtifactTranspilerService.ensureEsbuildBinary] File exists but is not executable: ${fallbackPath}`)
+        logger.warn(
+          `[ArtifactTranspilerService.ensureEsbuildBinary] File exists but is not executable: ${fallbackPath}`
+        )
       }
     } else {
       logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] File not found: ${fallbackPath}`)
@@ -511,25 +503,28 @@ export class ArtifactTranspilerService {
       // Ensure the downloaded binary is executable
       if (await this.ensureExecutable(fallbackPath)) {
         process.env.ESBUILD_BINARY_PATH = fallbackPath
-        logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file is executable, using downloaded binary at ${fallbackPath}`)
+        logger.info(
+          `[ArtifactTranspilerService.ensureEsbuildBinary] ✓ esbuild file is executable, using downloaded binary at ${fallbackPath}`
+        )
         logger.info(`[ArtifactTranspilerService.ensureEsbuildBinary] EXIT - Success (downloaded)`)
       } else {
-        logger.error(`[ArtifactTranspilerService.ensureEsbuildBinary] ✗ Downloaded file is not executable: ${fallbackPath}`)
+        logger.error(
+          `[ArtifactTranspilerService.ensureEsbuildBinary] ✗ Downloaded file is not executable: ${fallbackPath}`
+        )
       }
     } catch (downloadError) {
       const errorContext = formatErrorWithContext(downloadError, 'ensureEsbuildBinary()')
       logger.error('[ArtifactTranspilerService.ensureEsbuildBinary] ✗ Failed to download esbuild binary:', errorContext)
       throw new Error(
         `Failed to download esbuild binary for ${packageName} at ${errorContext.file}:${errorContext.line} ` +
-        `in ${errorContext.function}: ${errorContext.message}. ` +
-        `Ensure esbuild packages are unpacked in electron-builder.yml or network access is available.`
+          `in ${errorContext.function}: ${errorContext.message}. ` +
+          `Ensure esbuild packages are unpacked in electron-builder.yml or network access is available.`
       )
     }
   }
 
   private getPlatformPackageName(): string | undefined {
-    const platformMap =
-      ArtifactTranspilerService.ESBUILD_PACKAGES[process.platform as EsbuildSupportedPlatform]
+    const platformMap = ArtifactTranspilerService.ESBUILD_PACKAGES[process.platform as EsbuildSupportedPlatform]
     return platformMap?.[process.arch]
   }
 
@@ -538,14 +533,7 @@ export class ArtifactTranspilerService {
   }
 
   private getBundledBinaryPath(): string {
-    return join(
-      process.resourcesPath,
-      'app.asar.unpacked',
-      'node_modules',
-      'esbuild',
-      'bin',
-      this.getBinaryFilename()
-    )
+    return join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'esbuild', 'bin', this.getBinaryFilename())
   }
 
   private getUserDataBinaryPath(packageName: string): string {
@@ -582,7 +570,7 @@ export class ArtifactTranspilerService {
       logger.debug(`[ArtifactTranspilerService] Binary does not exist: ${path}`)
       return false
     }
-    
+
     try {
       const stats = await stat(path)
       const mode = stats.mode
@@ -591,23 +579,23 @@ export class ArtifactTranspilerService {
     } catch {
       // Ignore stat errors
     }
-    
+
     if (await this.isExecutable(path)) {
       logger.debug(`[ArtifactTranspilerService] Binary is already executable: ${path}`)
       return true
     }
-    
+
     // File exists but isn't executable, try to make it executable
     try {
       logger.info(`[ArtifactTranspilerService] Binary exists but is not executable, setting permissions: ${path}`)
       await chmod(path, 0o755)
-      
+
       // Verify the permissions were set
       const stats = await stat(path)
       const mode = stats.mode
       const permissions = (mode & parseInt('777', 8)).toString(8)
       logger.info(`[ArtifactTranspilerService] Set execute permissions on ${path}, new permissions: ${permissions}`)
-      
+
       const isNowExecutable = await this.isExecutable(path)
       if (!isNowExecutable) {
         logger.warn(`[ArtifactTranspilerService] Binary permissions set but still not executable: ${path}`)
@@ -770,7 +758,7 @@ export class ArtifactTranspilerService {
       // CSS is already loaded in the sandbox, just return empty object
       return {};
     }
-    
+
     const moduleMap = {
       'react': window.React,
       'react-dom': window.ReactDOM,
@@ -786,7 +774,7 @@ export class ArtifactTranspilerService {
       '@ai-sdk/openai': window.AISDKOpenAI,
       '@ai-sdk/anthropic': window.AISDKAnthropic
     };
-    
+
     if (moduleMap[moduleName]) {
       return moduleMap[moduleName];
     }
@@ -812,15 +800,15 @@ export class ArtifactTranspilerService {
         }
       }
     }
-    
+
     throw new Error('Module not found: ' + moduleName + '. Only approved runtime libraries are available.');
   };
 
   const exports = {};
   const module = { exports };
-  
+
   ${code}
-  
+
   const resolved = module.exports || exports;
   if (resolved && typeof resolved === 'object') {
     Object.keys(resolved).forEach(function(key) {
@@ -857,7 +845,7 @@ export class ArtifactTranspilerService {
       codeLength: code.length,
       usingWasm: this.usingWasm
     })
-    
+
     const { loader, extension } = this.resolveReactLoader(language, hasJsx)
     logger.info(`[ArtifactTranspilerService.transpileReact] Resolved loader: ${loader}, extension: ${extension}`)
 
@@ -883,15 +871,22 @@ export class ArtifactTranspilerService {
       logger.info(`[ArtifactTranspilerService.transpileReact] ✓ esbuild.build() completed, checking output...`)
       const output = result.outputFiles?.[0]
       if (!output) {
-        const errorContext = formatErrorWithContext(new Error('React transpilation produced no output'), 'transpileReact()')
+        const errorContext = formatErrorWithContext(
+          new Error('React transpilation produced no output'),
+          'transpileReact()'
+        )
         logger.error('[ArtifactTranspilerService.transpileReact] ✗ No output produced:', errorContext)
         throw new Error(`React transpilation produced no output at ${errorContext.file}:${errorContext.line}`)
       }
 
-      logger.info(`[ArtifactTranspilerService.transpileReact] Output size: ${output.text.length} chars, warnings: ${result.warnings.length}`)
+      logger.info(
+        `[ArtifactTranspilerService.transpileReact] Output size: ${output.text.length} chars, warnings: ${result.warnings.length}`
+      )
       const wrappedCode = this.wrapModule(output.text)
-      logger.info(`[ArtifactTranspilerService.transpileReact] EXIT - Success (wrapped code size: ${wrappedCode.length} chars)`)
-      
+      logger.info(
+        `[ArtifactTranspilerService.transpileReact] EXIT - Success (wrapped code size: ${wrappedCode.length} chars)`
+      )
+
       return {
         code: wrappedCode,
         warnings: result.warnings
@@ -918,44 +913,51 @@ export class ArtifactTranspilerService {
       codeLength: code.length,
       usingWasm: this.usingWasm
     })
-    
+
     try {
       logger.info(`[ArtifactTranspilerService.transpileSvelte] Calling esbuild.build() with Svelte plugin...`)
       const result = await this.esbuildImpl.build({
-      stdin: {
-        contents: code,
-        resolveDir: process.cwd(),
-        sourcefile: 'Component.svelte'
-      },
-      bundle: true,
-      write: false,
-      format: 'cjs',
-      platform: 'browser',
-      target: 'es2020',
-      sourcemap: 'inline',
-      logLevel: 'warning',
-      plugins: [
-        sveltePlugin({
-          compilerOptions: {
-            css: 'injected',
-            generate: 'client'
-          }
-        })
-      ]
-    })
+        stdin: {
+          contents: code,
+          resolveDir: process.cwd(),
+          sourcefile: 'Component.svelte'
+        },
+        bundle: true,
+        write: false,
+        format: 'cjs',
+        platform: 'browser',
+        target: 'es2020',
+        sourcemap: 'inline',
+        logLevel: 'warning',
+        plugins: [
+          sveltePlugin({
+            compilerOptions: {
+              css: 'injected',
+              generate: 'client'
+            }
+          })
+        ]
+      })
 
       logger.info(`[ArtifactTranspilerService.transpileSvelte] ✓ esbuild.build() completed, checking output...`)
       const output = result.outputFiles?.[0]
       if (!output) {
-        const errorContext = formatErrorWithContext(new Error('Svelte transpilation produced no output'), 'transpileSvelte()')
+        const errorContext = formatErrorWithContext(
+          new Error('Svelte transpilation produced no output'),
+          'transpileSvelte()'
+        )
         logger.error('[ArtifactTranspilerService.transpileSvelte] ✗ No output produced:', errorContext)
         throw new Error(`Svelte transpilation produced no output at ${errorContext.file}:${errorContext.line}`)
       }
 
-      logger.info(`[ArtifactTranspilerService.transpileSvelte] Output size: ${output.text.length} chars, warnings: ${result.warnings.length}`)
+      logger.info(
+        `[ArtifactTranspilerService.transpileSvelte] Output size: ${output.text.length} chars, warnings: ${result.warnings.length}`
+      )
       const wrappedCode = this.wrapModule(output.text)
-      logger.info(`[ArtifactTranspilerService.transpileSvelte] EXIT - Success (wrapped code size: ${wrappedCode.length} chars)`)
-      
+      logger.info(
+        `[ArtifactTranspilerService.transpileSvelte] EXIT - Success (wrapped code size: ${wrappedCode.length} chars)`
+      )
+
       return {
         code: wrappedCode,
         warnings: result.warnings
@@ -976,37 +978,44 @@ export class ArtifactTranspilerService {
       codeLength: code.length,
       usingWasm: this.usingWasm
     })
-    
+
     try {
       logger.info(`[ArtifactTranspilerService.transpileSolid] Calling esbuild.build() with Solid plugin...`)
       const result = await this.esbuildImpl.build({
-      stdin: {
-        contents: code,
-        resolveDir: process.cwd(),
-        sourcefile: 'Component.tsx'
-      },
-      write: false,
-      bundle: false,
-      format: 'cjs',
-      platform: 'browser',
-      target: 'es2020',
-      sourcemap: 'inline',
-      logLevel: 'warning',
-      plugins: [solidPlugin()]
-    })
+        stdin: {
+          contents: code,
+          resolveDir: process.cwd(),
+          sourcefile: 'Component.tsx'
+        },
+        write: false,
+        bundle: false,
+        format: 'cjs',
+        platform: 'browser',
+        target: 'es2020',
+        sourcemap: 'inline',
+        logLevel: 'warning',
+        plugins: [solidPlugin()]
+      })
 
       logger.info(`[ArtifactTranspilerService.transpileSolid] ✓ esbuild.build() completed, checking output...`)
       const output = result.outputFiles?.[0]
       if (!output) {
-        const errorContext = formatErrorWithContext(new Error('Solid transpilation produced no output'), 'transpileSolid()')
+        const errorContext = formatErrorWithContext(
+          new Error('Solid transpilation produced no output'),
+          'transpileSolid()'
+        )
         logger.error('[ArtifactTranspilerService.transpileSolid] ✗ No output produced:', errorContext)
         throw new Error(`Solid transpilation produced no output at ${errorContext.file}:${errorContext.line}`)
       }
 
-      logger.info(`[ArtifactTranspilerService.transpileSolid] Output size: ${output.text.length} chars, warnings: ${result.warnings.length}`)
+      logger.info(
+        `[ArtifactTranspilerService.transpileSolid] Output size: ${output.text.length} chars, warnings: ${result.warnings.length}`
+      )
       const wrappedCode = this.wrapModule(output.text)
-      logger.info(`[ArtifactTranspilerService.transpileSolid] EXIT - Success (wrapped code size: ${wrappedCode.length} chars)`)
-      
+      logger.info(
+        `[ArtifactTranspilerService.transpileSolid] EXIT - Success (wrapped code size: ${wrappedCode.length} chars)`
+      )
+
       return {
         code: wrappedCode,
         warnings: result.warnings
@@ -1027,24 +1036,24 @@ export class ArtifactTranspilerService {
       codeLength: code.length,
       usingWasm: this.usingWasm
     })
-    
+
     try {
       logger.info(`[ArtifactTranspilerService.transpileVue] Calling esbuild.build() with Vue plugin...`)
       const result = await this.esbuildImpl.build({
-      stdin: {
-        contents: code,
-        resolveDir: process.cwd(),
-        sourcefile: 'Component.vue'
-      },
-      write: false,
-      bundle: true,
-      format: 'cjs',
-      platform: 'browser',
-      target: 'es2020',
-      sourcemap: 'inline',
-      logLevel: 'warning',
-      plugins: [vuePlugin()]
-    })
+        stdin: {
+          contents: code,
+          resolveDir: process.cwd(),
+          sourcefile: 'Component.vue'
+        },
+        write: false,
+        bundle: true,
+        format: 'cjs',
+        platform: 'browser',
+        target: 'es2020',
+        sourcemap: 'inline',
+        logLevel: 'warning',
+        plugins: [vuePlugin()]
+      })
 
       logger.info(`[ArtifactTranspilerService.transpileVue] ✓ esbuild.build() completed, checking output...`)
       const output = result.outputFiles?.[0]
@@ -1054,10 +1063,14 @@ export class ArtifactTranspilerService {
         throw new Error(`Vue transpilation produced no output at ${errorContext.file}:${errorContext.line}`)
       }
 
-      logger.info(`[ArtifactTranspilerService.transpileVue] Output size: ${output.text.length} chars, warnings: ${result.warnings.length}`)
+      logger.info(
+        `[ArtifactTranspilerService.transpileVue] Output size: ${output.text.length} chars, warnings: ${result.warnings.length}`
+      )
       const wrappedCode = this.wrapModule(output.text)
-      logger.info(`[ArtifactTranspilerService.transpileVue] EXIT - Success (wrapped code size: ${wrappedCode.length} chars)`)
-      
+      logger.info(
+        `[ArtifactTranspilerService.transpileVue] EXIT - Success (wrapped code size: ${wrappedCode.length} chars)`
+      )
+
       return {
         code: wrappedCode,
         warnings: result.warnings
@@ -1080,7 +1093,7 @@ export class ArtifactTranspilerService {
       filename: request.filename,
       codeLength: request.code.length
     })
-    
+
     if (!this.isInitialized) {
       logger.info(`[ArtifactTranspilerService.transpile] Not initialized, calling initialize()...`)
       await this.initialize()
@@ -1097,30 +1110,40 @@ export class ArtifactTranspilerService {
       // Step 2: Transpile with appropriate handler
       let result: TranspileResult
 
-      logger.info(`[ArtifactTranspilerService.transpile] Step 2: Routing to framework-specific transpiler: ${request.framework}`)
+      logger.info(
+        `[ArtifactTranspilerService.transpile] Step 2: Routing to framework-specific transpiler: ${request.framework}`
+      )
       switch (request.framework) {
         case 'react':
         case 'preact': // Preact uses same JSX syntax
           logger.info(`[ArtifactTranspilerService.transpile] Preprocessing imports for React/Preact...`)
           const processedReactCode = this.preprocessImports(request.code)
-          logger.info(`[ArtifactTranspilerService.transpile] Preprocessed code length: ${processedReactCode.length} (original: ${request.code.length})`)
+          logger.info(
+            `[ArtifactTranspilerService.transpile] Preprocessed code length: ${processedReactCode.length} (original: ${request.code.length})`
+          )
           result = await this.transpileReact(processedReactCode, request.language, hasJsx)
           break
 
         case 'svelte':
-          logger.info(`[ArtifactTranspilerService.transpile] Svelte compiler handles imports internally, skipping preprocessing`)
+          logger.info(
+            `[ArtifactTranspilerService.transpile] Svelte compiler handles imports internally, skipping preprocessing`
+          )
           result = await this.transpileSvelte(request.code)
           break
 
         case 'vue':
-          logger.info(`[ArtifactTranspilerService.transpile] Vue compiler handles imports internally, skipping preprocessing`)
+          logger.info(
+            `[ArtifactTranspilerService.transpile] Vue compiler handles imports internally, skipping preprocessing`
+          )
           result = await this.transpileVue(request.code)
           break
 
         case 'solid':
           logger.info(`[ArtifactTranspilerService.transpile] Preprocessing imports for Solid...`)
           const processedSolidCode = this.preprocessImports(request.code)
-          logger.info(`[ArtifactTranspilerService.transpile] Preprocessed code length: ${processedSolidCode.length} (original: ${request.code.length})`)
+          logger.info(
+            `[ArtifactTranspilerService.transpile] Preprocessed code length: ${processedSolidCode.length} (original: ${request.code.length})`
+          )
           result = await this.transpileSolid(processedSolidCode)
           break
 
@@ -1135,11 +1158,16 @@ export class ArtifactTranspilerService {
       }
 
       const duration = performance.now() - startTime
-      logger.info(`[ArtifactTranspilerService.transpile] ✓ Transpilation complete: ${request.framework} artifact in ${duration.toFixed(2)}ms`)
+      logger.info(
+        `[ArtifactTranspilerService.transpile] ✓ Transpilation complete: ${request.framework} artifact in ${duration.toFixed(2)}ms`
+      )
 
       // Log warnings if any
       if (result.warnings && result.warnings.length > 0) {
-        logger.warn(`[ArtifactTranspilerService.transpile] Transpilation warnings (${result.warnings.length}):`, result.warnings)
+        logger.warn(
+          `[ArtifactTranspilerService.transpile] Transpilation warnings (${result.warnings.length}):`,
+          result.warnings
+        )
       }
 
       logger.info(`[ArtifactTranspilerService.transpile] EXIT - Success (final code size: ${result.code.length} chars)`)
@@ -1158,17 +1186,22 @@ export class ArtifactTranspilerService {
       // Format esbuild errors nicely
       if (error && typeof error === 'object' && 'errors' in error) {
         const esbuildError = error as TransformFailure
-        logger.info(`[ArtifactTranspilerService.transpile] Formatting esbuild error (${esbuildError.errors.length} error(s))...`)
+        logger.info(
+          `[ArtifactTranspilerService.transpile] Formatting esbuild error (${esbuildError.errors.length} error(s))...`
+        )
         const firstError = esbuildError.errors[0]
 
         if (firstError) {
           // Determine default filename based on framework
-          const defaultFilename = 
-            request.framework === 'svelte' ? 'Component.svelte' :
-            request.framework === 'vue' ? 'Component.vue' :
-            request.framework === 'solid' ? 'Component.tsx' :
-            `Component.${request.language === 'typescript' ? 'tsx' : 'jsx'}`
-          
+          const defaultFilename =
+            request.framework === 'svelte'
+              ? 'Component.svelte'
+              : request.framework === 'vue'
+                ? 'Component.vue'
+                : request.framework === 'solid'
+                  ? 'Component.tsx'
+                  : `Component.${request.language === 'typescript' ? 'tsx' : 'jsx'}`
+
           const transpileError: TranspileError = {
             message: firstError.text,
             location: firstError.location
@@ -1211,7 +1244,10 @@ export class ArtifactTranspilerService {
     logger.info('ArtifactTranspilerService disposed')
   }
 
-  private resolveReactLoader(language: 'typescript' | 'javascript', hasJsx: boolean): {
+  private resolveReactLoader(
+    language: 'typescript' | 'javascript',
+    hasJsx: boolean
+  ): {
     loader: Loader
     extension: string
   } {
@@ -1264,4 +1300,3 @@ export class ArtifactTranspilerService {
 
 // Export singleton instance
 export const artifactTranspilerService = new ArtifactTranspilerService()
-
